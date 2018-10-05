@@ -4,4 +4,4 @@
 
 Fall 2018
 
-Authors: Riccardo Conti, Pablo Pfister
+Authors: Pablo Pfister
