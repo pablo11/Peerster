@@ -3,61 +3,69 @@ package main
 import (
     "fmt"
     "flag"
-    "net"
+    "strings"
+    "github.com/pablo11/Peerster/server"
 )
 
 func main() {
 
-    // Definition of the cli flags
     uiPort := flag.String("UIPort", "8080", "Port for the UI client (default \"8080\")")
     gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "ip:port for the gossiper (default \"127.0.0.1:5000\")")
     name := flag.String("name", "cryptop", "Name of the gossiper")
-    peers := flag.String("peers", "8080", "Comma separated list of peers of the form ip:port")
+    peersParam := flag.String("peers", "", "Comma separated list of peers of the form ip:port")
     simple := flag.Bool("simple", false, "Run gossiper in simple broadcast mode")
 
-    // TODO: validate flags
-    err := validateUiPort(*uiPort)
-    if err != nil {
-        fmt.Println(err)
+    flag.Parse()
+
+    peers := strings.Split(*peersParam, ",")
+    if *peersParam == "" {
+        peers = make([]string, 0)
     }
 
-    simpleMessage := SimpleMessage{
+    /*simpleMessage := SimpleMessage{
         OriginalName: "",
         RelayPeerAddr: "",
         Contents: "",
     }
     packetToSend := GossipPacket{Simple: &simpleMessage}
+*/
 
+    if *simple {
+        g := server.NewGossiper(*gossipAddr, *name, peers)
 
-    fmt.Println("!oG ,olleH!!!")
+        go g.ListenPeers()
+        go g.ListenClient(*uiPort)
 
-    go listenOnPort("8080", func(conn net.Conn) {
-        fmt.Println(conn)
-    })
+        for {}
+    } else {
+        fmt.Println("Not implemented yet. Please provide the -simple flag")
+    }
 }
 
-func listenOnPort(port string, handler func(net.Conn)) {
-    ln, err := net.Listen("udp", ":" + port)
+/*
+func setupFlags() error {
+    uiPort := flag.String("UIPort", "8080", "Port for the UI client (default \"8080\")")
+    gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "ip:port for the gossiper (default \"127.0.0.1:5000\")")
+    name := flag.String("name", "cryptop", "Name of the gossiper")
+    peersParam := flag.String("peers", "", "Comma separated list of peers of the form ip:port")
+    simple := flag.Bool("simple", false, "Run gossiper in simple broadcast mode")
+
+    flag.Parse()
+
+    // Validate uiPort
+    err := validateUiPort(*uiPort)
     if err != nil {
-    	// handle error
-        fmt.Println("Network connection error")
-        fmt.Print(err)
-        return
+        return err
     }
-    for {
-    	conn, err := ln.Accept()
-    	if err != nil {
-    		// handle error
-    	}
-    	go handler(conn)
 
+    // TODO: validate flags
 
-        // TODO: remove the return to have the process work forever
-        return
-    }
+    UI_PORT = *uiPort
+    GOSSIP_ADDR = *gossipAddr
+    NAME = *name
+    PEERS = strings.Split(*peersParam, ",")
+    SIMPLE_MODE = *simple
+
+    return nil
 }
-
-func handleListeningConnection(conn net.Conn) {
-
-
-}
+*/
