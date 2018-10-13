@@ -9,8 +9,8 @@ Authors: Pablo Pfister
 ### Run it
 
 go build
-./Peerster -UIPort=10001 -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002 -name=nodeA
-./Peerster -UIPort=10002 -gossipAddr=127.0.0.1:5002 -peers=127.0.0.1:5001 -name=nodeB
+./Peerster -UIPort=10001 -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002 -name=nodeA -simple
+./Peerster -UIPort=10002 -gossipAddr=127.0.0.1:5002 -peers=127.0.0.1:5001 -name=nodeB -simple
 
 or
 
@@ -23,3 +23,9 @@ Just write in the terminal:
 echo -n "hello" >/dev/udp/localhost/5000
 
 If Peerster is running it will handle it
+
+
+
+### Run the webserver
+./webserver -UIPort=8080 -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002 -name=nodeA -simple
+./webserver -UIPort=8081 -gossipAddr=127.0.0.1:5002 -peers=127.0.0.1:5001 -name=nodeB -simple

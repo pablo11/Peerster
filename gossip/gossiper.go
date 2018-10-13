@@ -1,4 +1,4 @@
-package server
+package gossip
 
 import (
     "fmt"
@@ -37,6 +37,14 @@ func NewGossiper(address, name string, peers []string) *Gossiper {
     }
 }
 
+func (g *Gossiper) GetAddress() string {
+    return g.address.String()
+}
+
+func (g *Gossiper) GetPeers() []string {
+    return g.peers
+}
+
 func (g *Gossiper) ListenPeers() {
     for {
         packetBuffer := make([]byte, 2*1024)
@@ -64,7 +72,7 @@ func (g *Gossiper) ListenPeers() {
 
         // Store addr in the list of peers if not already present
         // Could get address from: _, addr, _ := g.conn.ReadFrom(packetBuffer)
-        g.addPeer(gp.Simple.RelayPeerAddr)
+        g.AddPeer(gp.Simple.RelayPeerAddr)
 
         // Change the relay peer field to this node address
         receivedFrom := gp.Simple.RelayPeerAddr
@@ -104,7 +112,7 @@ func (g *Gossiper) ListenClient(uiPort string) {
 
         // Prepare contents removing unused bytes
         contents := string(bytes.Trim(packetBuffer, "\x00"))
-
+/*
         sm := model.SimpleMessage{
             OriginalName: g.Name,
             RelayPeerAddr: g.address.String(),
@@ -117,7 +125,23 @@ func (g *Gossiper) ListenClient(uiPort string) {
 
         // Broadcast message to every peer
         go g.sendPacket(&gossipPacket, g.peers)
+*/
+        go g.SendSimpleMessage(contents)
     }
+}
+
+func (g *Gossiper) SendSimpleMessage(contents string) {
+    sm := model.SimpleMessage{
+        OriginalName: g.Name,
+        RelayPeerAddr: g.address.String(),
+        Contents: contents,
+    }
+
+    gossipPacket := model.GossipPacket{Simple: &sm}
+
+    g.printReceivedPacket("client", &gossipPacket)
+
+    g.sendPacket(&gossipPacket, g.peers)
 }
 
 func (g *Gossiper) sendPacket(pkt *model.GossipPacket, peersAddr []string) {
@@ -142,7 +166,7 @@ func (g *Gossiper) printReceivedPacket(mode string, pkt *model.GossipPacket) {
     fmt.Println()
 }
 
-func (g *Gossiper) addPeer(peer string) {
+func (g *Gossiper) AddPeer(peer string) {
     // Don't add yourself
     if peer == g.address.String() {
         return

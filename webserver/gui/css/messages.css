@@ -1,0 +1,25 @@
+.bg-gray {
+    background: #eee;
+}
+
+.message {
+    margin-left: 0px;
+    margin-right: 20px;
+}
+
+.message-from-me {
+    text-align:right;
+    background: #222;
+    color: #fff;
+    margin-left: 20px;
+    margin-right: 0px;
+}
+
+.scroll-to-bottom {
+    width: 40px;
+    height: 40px;
+    position: fixed;
+    bottom: 5px;
+    right: 5px;
+    border-radius: 20px;
+}
