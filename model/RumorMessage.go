@@ -1,5 +1,9 @@
 package model
 
+import (
+    "strconv"
+)
+
 type RumorMessage struct {
     Origin string
     ID uint32
@@ -9,7 +13,8 @@ type RumorMessage struct {
 func (rm *RumorMessage) String(mode, relayAddr string) string {
     switch mode {
     case "received":
-        return "RUMOR origin " + rm.Origin + " from " + relayAddr + " ID " + string(rm.ID) + " contents " + rm.Text
+        idStr := strconv.FormatUint(uint64(rm.ID), 10)
+        return "RUMOR origin " + rm.Origin + " from " + relayAddr + " ID " + idStr + " contents " + rm.Text
 
     case "mongering":
         return "MONGERING with " + relayAddr

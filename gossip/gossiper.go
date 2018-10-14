@@ -15,7 +15,8 @@ import (
 )
 
 const PACKET_BUFFER_LEN int = 1024
-const ANTI_ENTROPY_PERIOD time.Duration = 1 // Number of seconds to wait
+const ACK_STATUS_WAIT_TIME time.Duration = 4 // Number of seconds to wait
+const ANTI_ENTROPY_PERIOD time.Duration = 2 // Number of seconds to wait
 
 type Gossiper struct {
     address *net.UDPAddr
@@ -34,6 +35,9 @@ type Gossiper struct {
     nextMessageIdMutex sync.Mutex
     statusMutex sync.Mutex
     messagesMutex sync.Mutex
+
+    // Channel for wait for acknowledgement event
+    waitStatusChannel map[string]chan *model.StatusPacket
 }
 
 func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
@@ -56,6 +60,17 @@ func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
         nextMessageIdMutex: sync.Mutex{},
         statusMutex: sync.Mutex{},
         messagesMutex: sync.Mutex{},
+        waitStatusChannel: make(map[string]chan *model.StatusPacket),
+    }
+}
+
+func (g *Gossiper) Run(uiPort string) {
+    fmt.Println("==================================================================")
+
+    go g.listenPeers()
+    go g.listenClient(uiPort)
+    if (!g.simple) {
+        //go g.startAntiEntropy()
     }
 }
 
@@ -67,7 +82,7 @@ func (g *Gossiper) GetPeers() []string {
     return g.peers
 }
 
-func (g *Gossiper) ListenPeers() {
+func (g *Gossiper) listenPeers() {
     for {
         packetBuffer := make([]byte, 2 * PACKET_BUFFER_LEN)
         _, fromAddr, err := g.conn.ReadFrom(packetBuffer)
@@ -83,8 +98,9 @@ func (g *Gossiper) ListenPeers() {
             //fmt.Println("ERROR:", err)
         }
 
+        fmt.Println("🥕")
+
         // Store addr in the list of peers if not already present
-        // Could get address from: _, addr, _ := g.conn.ReadFrom(packetBuffer)
         g.AddPeer(fromAddr.String())
 
         switch {
@@ -107,10 +123,11 @@ func (g *Gossiper) ListenPeers() {
                 if gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
                     g.incrementVectorClock(gp.Rumor.Origin)
                     g.storeMessage(gp.Rumor)
-                    g.sendRumorMessage(gp.Rumor, true, "")
+                    g.sendRumorMessage(gp.Rumor, true, fromAddr.String())
                 }
 
                 // Send status message to the peer the rumor message was received from
+                fmt.Println("Send STATUS message")
                 g.sendStatusMessage(fromAddr.String())
 
             case gp.Status != nil:
@@ -130,9 +147,7 @@ func (g *Gossiper) ListenPeers() {
                 go g.sendMissingMessagesToPeer(fromAddr.String(), sm.Want)
 
                 // Notify "wait for acknowledgement" if a status is received from a peer we are waiting for
-                // TODO
-
-                // Flip coint to know if continouing the rumoring
+                g.getChannelForPeer(fromAddr.String()) <- sm
 
             default:
                 fmt.Println("WARNING: Unoknown message type")
@@ -141,7 +156,7 @@ func (g *Gossiper) ListenPeers() {
     }
 }
 
-func (g *Gossiper) ListenClient(uiPort string) {
+func (g *Gossiper) listenClient(uiPort string) {
     udpAddr := resolveAddress("127.0.0.1:" + uiPort)
     conn, err := net.ListenUDP("udp4", udpAddr)
     if err != nil {
@@ -160,6 +175,9 @@ func (g *Gossiper) ListenClient(uiPort string) {
 
         // Prepare contents removing unused bytes
         contents := string(bytes.Trim(packetBuffer, "\x00"))
+
+        fmt.Println("CLIENT MESSAGE " + contents)
+        fmt.Println()
 
         if g.simple {
             go g.SendSimpleMessage(contents)
@@ -189,13 +207,13 @@ func (g *Gossiper) ListenClient(uiPort string) {
     }
 }
 
-func (g *Gossiper) StartAntiEntropy() {
+func (g *Gossiper) startAntiEntropy() {
     for {
         time.Sleep(ANTI_ENTROPY_PERIOD * time.Second)
         if len(g.peers) > 0 {
             randomPeer := g.peers[rand.Intn(len(g.peers))]
             g.sendStatusMessage(randomPeer)
-            fmt.Println("ANTI ENTROPY")
+            fmt.Println("ANTI ENTROPY to " + randomPeer)
             fmt.Println()
         }
     }
@@ -210,35 +228,81 @@ func (g *Gossiper) SendSimpleMessage(contents string) {
 
     gp := model.GossipPacket{Simple: &sm}
 
-    g.printGossipPacket("client", "", &gp)
-
     g.sendGossipPacket(&gp, g.peers)
 }
 
+// If random is true, addr is used as "not send to this one"
+// If random is false, the rumor message is sent to addr
 func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr string) {
-    // Create the list of available peers by removing the sender
-    availablePeers := collections.Filter(g.peers, func(p string) bool{
-        return p != rm.Origin
-    })
-
-    // Check if the list of available peers is not empty
-    if len(availablePeers) < 1 {
-        return
-    }
-
     peer := addr
     if random {
+        // Create the list of available peers by removing the sender
+        availablePeers := collections.Filter(g.peers, func(p string) bool{
+            return p != addr
+        })
+
+        // Check if the list of available peers is not empty
+        if len(availablePeers) < 1 {
+            return
+        }
+
         // Select a random peer
         peer = availablePeers[rand.Intn(len(availablePeers))]
     }
 
     // Send him the packet
     gp := model.GossipPacket{Rumor: rm}
-    g.sendGossipPacket(&gp, []string{peer})
-
-    // TODO: Wait for acknowledgement
 
     g.printGossipPacket("mongering", peer, &gp)
+
+    g.sendGossipPacket(&gp, []string{peer})
+
+    // Wait for acknowledgement
+    g.waitStatusAcknowledgement(addr, rm)
+}
+
+func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMessage) {
+    ticker := time.NewTicker(ACK_STATUS_WAIT_TIME * time.Second)
+    defer ticker.Stop()
+
+    channel := g.getChannelForPeer(fromAddr)
+
+    select {
+    case sp := <-channel:
+        ticker.Stop()
+        // Check if StatusPacket acknowleges the RumorMessage
+        for _, statusPeer := range sp.Want {
+            // Find corresponding RumorMessage
+            if statusPeer.Identifier == rm.Origin && statusPeer.NextID == rm.ID {
+                return
+            }
+        }
+
+        // If we get ther, it means that the StatusPacket did not acknowledge the RumorMessage
+        g.flipCoin(rm)
+
+    case <-ticker.C:
+        ticker.Stop()
+        g.flipCoin(rm)
+    }
+}
+
+func (g *Gossiper) getChannelForPeer(addr string) chan *model.StatusPacket {
+    _, channelExists := g.waitStatusChannel[addr]
+    if !channelExists {
+        g.waitStatusChannel[addr] = make(chan *model.StatusPacket, 1024)
+    }
+    return g.waitStatusChannel[addr]
+}
+
+func (g *Gossiper) flipCoin(rm *model.RumorMessage) {
+    if rand.Int() % 2 == 0 {
+        if len(g.peers) > 0 {
+            randomPeer := g.peers[rand.Intn(len(g.peers))]
+            g.sendRumorMessage(rm, false, randomPeer)
+            fmt.Println("FLIPPED COIN sending rumor to " + randomPeer)
+        }
+    }
 }
 
 func (g *Gossiper) sendStatusMessage(toPeer string) {
@@ -262,6 +326,8 @@ func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) 
     }
 
     for i := 0; i < len(peersAddr); i++ {
+        fmt.Println("SENDING PACKET to " + peersAddr[i])
+
         addr := resolveAddress(peersAddr[i])
         g.conn.WriteToUDP(packetBytes, addr)
     }

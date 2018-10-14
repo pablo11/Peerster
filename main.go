@@ -23,12 +23,7 @@ func main() {
     }
 
     g := gossip.NewGossiper(*gossipAddr, *name, peers, *simple)
-
-    go g.ListenPeers()
-    go g.ListenClient(*uiPort)
-    if (!*simple) {
-        go g.StartAntiEntropy()
-    }
+    g.Run(*uiPort)
 
     for {}
 }

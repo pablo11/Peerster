@@ -29,3 +29,8 @@ If Peerster is running it will handle it
 ### Run the webserver
 ./webserver -UIPort=8080 -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002 -name=nodeA -simple
 ./webserver -UIPort=8081 -gossipAddr=127.0.0.1:5002 -peers=127.0.0.1:5001 -name=nodeB -simple
+
+
+### Run the client
+./client -UIPort=10001 -msg=hello
+./client -UIPort=10002 -msg=hello

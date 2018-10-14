@@ -1,5 +1,9 @@
 package model
 
+import (
+    "strconv"
+)
+
 type StatusPacket struct {
     Want []PeerStatus
 }
@@ -13,7 +17,8 @@ type PeerStatus struct {
 func (sp *StatusPacket) String(relayAddr string) string {
     strPeersStatus := ""
     for i := 0; i < len(sp.Want); i++ {
-        strPeersStatus += " peer " + sp.Want[i].Identifier + " nextID " + string(sp.Want[i].NextID)
+        nextIdStr := strconv.FormatUint(uint64(sp.Want[i].NextID), 10)
+        strPeersStatus += " peer " + sp.Want[i].Identifier + " nextID " + nextIdStr
     }
 
     return "STATUS from " + relayAddr + strPeersStatus
