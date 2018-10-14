@@ -16,9 +16,10 @@ type Gossiper struct {
     conn *net.UDPConn
     Name string
     peers []string
+    simple bool
 }
 
-func NewGossiper(address, name string, peers []string) *Gossiper {
+func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
     udpAddr, err := net.ResolveUDPAddr("udp4", address)
     if err != nil {
         log.Fatal(err)
@@ -34,6 +35,7 @@ func NewGossiper(address, name string, peers []string) *Gossiper {
         conn: udpConn,
         Name: name,
         peers: peers,
+        simple: simple,
     }
 }
 
@@ -48,16 +50,9 @@ func (g *Gossiper) GetPeers() []string {
 func (g *Gossiper) ListenPeers() {
     for {
         packetBuffer := make([]byte, 2*1024)
-        packetLen, addr, err := g.conn.ReadFrom(packetBuffer)
+        _, fromAddr, err := g.conn.ReadFrom(packetBuffer)
         if err != nil {
             fmt.Println(err)
-            continue
-        }
-
-        // TODO: return error if the packetLen is bigger than the buffer size
-        if packetLen > 2*1024 {
-            fmt.Println("⚠️ WARNING: packet length exceeds allocated space")
-            log.Fatal("Packet length exeeded allocated memory", addr)
             continue
         }
 
@@ -68,20 +63,27 @@ func (g *Gossiper) ListenPeers() {
             //fmt.Println("ERROR:", err)
         }
 
-        g.printReceivedPacket("peer", &gp)
-
         // Store addr in the list of peers if not already present
         // Could get address from: _, addr, _ := g.conn.ReadFrom(packetBuffer)
-        g.AddPeer(gp.Simple.RelayPeerAddr)
+        g.AddPeer(fromAddr.String())
 
-        // Change the relay peer field to this node address
-        receivedFrom := gp.Simple.RelayPeerAddr
-        gp.Simple.RelayPeerAddr = g.address.String()
+        switch {
+            case gp.Simple != nil:
+                g.printReceivedPacket("peer", &gp)
 
-        // Broadcast the message to every peer except the one the message was received from
-        go g.sendPacket(&gp, collections.Filter(g.peers, func(p string) bool{
-            return p != receivedFrom
-        }))
+                // Change the relay peer field to this node address
+                receivedFrom := gp.Simple.RelayPeerAddr
+                gp.Simple.RelayPeerAddr = g.address.String()
+
+                // Broadcast the message to every peer except the one the message was received from
+                go g.sendPacket(&gp, collections.Filter(g.peers, func(p string) bool{
+                    return p != receivedFrom
+                }))
+
+            default:
+                fmt.Println("WARNING: Unoknown message type")
+        }
+
     }
 }
 
@@ -99,34 +101,21 @@ func (g *Gossiper) ListenClient(uiPort string) {
     packetBuffer := make([]byte, 1024)
 
     for {
-        packetLen, _, err := conn.ReadFromUDP(packetBuffer)
+        _, _, err := conn.ReadFromUDP(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
         }
 
-        // TODO: return error if the packetLen is bigger than the buffer size
-        if packetLen > 1024 {
-            fmt.Println("⚠️ WARNING: packet length exceeds allocated space")
-        }
-
         // Prepare contents removing unused bytes
         contents := string(bytes.Trim(packetBuffer, "\x00"))
-/*
-        sm := model.SimpleMessage{
-            OriginalName: g.Name,
-            RelayPeerAddr: g.address.String(),
-            Contents: contents,
+
+        if g.simple {
+            go g.SendSimpleMessage(contents)
+        } else {
+            fmt.Println("Not implemented!")
+            // TODO
         }
-
-        gossipPacket := model.GossipPacket{Simple: &sm}
-
-        g.printReceivedPacket("client", &gossipPacket)
-
-        // Broadcast message to every peer
-        go g.sendPacket(&gossipPacket, g.peers)
-*/
-        go g.SendSimpleMessage(contents)
     }
 }
 
