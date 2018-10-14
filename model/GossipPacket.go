@@ -6,9 +6,18 @@ type GossipPacket struct {
     Status *StatusPacket
 }
 
-func (gp *GossipPacket) String(mode string) string {
-    if gp.Simple == nil {
-        return ""
+func (gp *GossipPacket) String(mode, relayAddr string) string {
+    switch {
+        case gp.Simple != nil:
+            return gp.Simple.String(mode)
+
+        case gp.Rumor != nil:
+            return gp.Rumor.String(mode, relayAddr)
+
+        case gp.Status != nil:
+            return gp.Status.String(relayAddr)
+
+        default:
+            return ""
     }
-    return gp.Simple.String(mode)
 }

@@ -13,7 +13,8 @@ func (sm *SimpleMessage) String(mode string) string {
 
     case "peer":
         return "SIMPLE MESSAGE origin " + sm.OriginalName + " from " + sm.RelayPeerAddr + " contents " + sm.Contents
-    }
 
-    return ""
+    default:
+        return ""
+    }
 }

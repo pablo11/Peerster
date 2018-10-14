@@ -26,6 +26,9 @@ func main() {
 
     go g.ListenPeers()
     go g.ListenClient(*uiPort)
+    if (!*simple) {
+        go g.StartAntiEntropy()
+    }
 
     for {}
 }
