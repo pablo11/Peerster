@@ -162,7 +162,7 @@ func (g *Gossiper) ListenClient(uiPort string) {
         contents := string(bytes.Trim(packetBuffer, "\x00"))
 
         if g.simple {
-            go g.sendSimpleMessage(contents)
+            go g.SendSimpleMessage(contents)
         } else {
             // Build RumorMessage
             rm := &model.RumorMessage{
@@ -201,7 +201,7 @@ func (g *Gossiper) StartAntiEntropy() {
     }
 }
 
-func (g *Gossiper) sendSimpleMessage(contents string) {
+func (g *Gossiper) SendSimpleMessage(contents string) {
     sm := model.SimpleMessage{
         OriginalName: g.Name,
         RelayPeerAddr: g.address.String(),
