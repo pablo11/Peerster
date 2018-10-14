@@ -118,7 +118,7 @@ do
         	failed="T"
     	fi
 	fi
-	
+
 	if [[ "$gossipPort" != 5006 ]] ; then
 		if !(grep -Eq "$msgLine5" "${outputFiles[$i]}") ; then
         	failed="T"
@@ -175,7 +175,7 @@ do
 	msgLine2="STATUS from 127.0.0.1:$nextPort"
 	msgLine3="peer E nextID 3"
 	msgLine4="peer B nextID 3"
-	msgLine5="peer G nextID 2"	
+	msgLine5="peer G nextID 2"
 
 	if !(grep -q "$msgLine1" "${outputFiles[$i]}") ; then
         failed="T"
@@ -285,4 +285,3 @@ if [[ "$failed" == "T" ]] ; then
 else
     echo -e "${GREEN}***PASSED***${NC}"
 fi
-

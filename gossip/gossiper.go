@@ -15,7 +15,7 @@ import (
 )
 
 const PACKET_BUFFER_LEN int = 1024
-const ACK_STATUS_WAIT_TIME time.Duration = 4 // Number of seconds to wait
+const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait
 const ANTI_ENTROPY_PERIOD time.Duration = 2 // Number of seconds to wait
 
 type Gossiper struct {
@@ -65,12 +65,10 @@ func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
 }
 
 func (g *Gossiper) Run(uiPort string) {
-    //fmt.Println("==================================================================")
-
     go g.listenPeers()
     go g.listenClient(uiPort)
     if (!g.simple) {
-        //go g.startAntiEntropy()
+        go g.startAntiEntropy()
     }
 }
 
@@ -134,36 +132,6 @@ func (g *Gossiper) listenPeers() {
 
                 g.compareVectorClocks(sp, fromAddr.String())
 
-/*
-                if same
-                    in sync + flip coin
-
-                iterate through
-                    if ihave something more
-                        send rumor
-                    if he has something more
-                        send status
-*/
-
-
-/*
-
-                // Check if the other peer has some messages that this gossiper doesn't have.
-                // In this case send him a StatusMessage to ask those messages
-                inSync := g.getOutOfSyncMessages(fromAddr.String(), sm.Want)
-                if inSync {
-                    fmt.Println("IN SYNC with " + fromAddr.String())
-                    fmt.Println()
-                }
-
-                // Send to the other peer messages that he doesn't have
-                go g.sendMissingMessagesToPeer(fromAddr.String(), sm.Want)
-
-                fmt.Println()
-
-                // Notify "wait for acknowledgement" if a status is received from a peer we are waiting for
-                g.getChannelForPeer(fromAddr.String()) <- sm
-*/
             default:
                 fmt.Println("WARNING: Unoknown message type")
         }
@@ -204,11 +172,10 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
 
     if len(sp.Want) == len(g.status) {
         // The two vectors are the same -> we are in sync with the peer
-        fmt.Println("IN SYNC with " + fromAddr)
+        fmt.Println("IN SYNC WITH " + fromAddr)
         fmt.Println()
 
         // Flip the coin and stop timer
-        //fmt.Println("🥝")
         g.getChannelForPeer(fromAddr) <- sp
         return
     } else {
@@ -280,10 +247,6 @@ func (g *Gossiper) startAntiEntropy() {
         if len(g.peers) > 0 {
             randomPeer := g.peers[rand.Intn(len(g.peers))]
             g.sendStatusMessage(randomPeer)
-            /*
-            fmt.Println("ANTI ENTROPY to " + randomPeer)
-            fmt.Println()
-            */
         }
     }
 }
@@ -327,7 +290,7 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
     g.sendGossipPacket(&gp, []string{peer})
 
     // Wait for acknowledgement
-    g.waitStatusAcknowledgement(addr, rm)
+    go g.waitStatusAcknowledgement(addr, rm)
 }
 
 func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMessage) {
@@ -339,18 +302,6 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
     select {
     case <-channel:
         ticker.Stop()
-
-        fmt.Print("🍌")
-
-        /*
-        // Check if StatusPacket acknowleges the RumorMessage
-        for _, statusPeer := range sp.Want {
-            // Find corresponding RumorMessage
-            if statusPeer.Identifier == rm.Origin && statusPeer.NextID == rm.ID {
-                return
-            }
-        }
-        */
 
         // If we get ther, it means that the StatusPacket did not acknowledge the RumorMessage
         g.flipCoin(rm)
@@ -400,8 +351,6 @@ func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) 
     }
 
     for i := 0; i < len(peersAddr); i++ {
-        //fmt.Println("SENDING PACKET to " + peersAddr[i])
-
         addr := resolveAddress(peersAddr[i])
         g.conn.WriteToUDP(packetBytes, addr)
     }
@@ -458,40 +407,6 @@ func (g *Gossiper) incrementVectorClock(origin string) {
 
 func (g *Gossiper) storeMessage(rm *model.RumorMessage) {
 	g.messages[rm.Origin] = append(g.messages[rm.Origin], rm)
-}
-
-// Checks if otherStatus has something more than the current gossiper.
-// If it is the case, the gossiper sends a StatusMessage to this peer.
-// It returns true if the messages are in sync, false otherwise
-func (g *Gossiper) getOutOfSyncMessages(peerAddr string, peerVectorClock []model.PeerStatus) bool {
-    for i := 0; i < len(peerVectorClock); i++ {
-        // Check if the origin is in the status map and the last message is in sync
-        originStatus, isInStatusMap := g.status[peerVectorClock[i].Identifier]
-        if !isInStatusMap || originStatus.NextID < peerVectorClock[i].NextID {
-            g.sendStatusMessage(peerAddr)
-            return false
-        }
-    }
-    return true
-}
-
-func (g *Gossiper) sendMissingMessagesToPeer(peerAddr string, peerVectorClock []model.PeerStatus) {
-    // Transform peerVectorClock in mapping from origin to PeerStatus.NextID
-    peerStatus := make(map[string]uint32)
-    for i := 0; i < len(peerVectorClock); i++ {
-        peerStatus[peerVectorClock[i].Identifier] = peerVectorClock[i].NextID
-    }
-
-    // Find what the gossiper has but not the other peer
-    for origin, vc := range g.status {
-        nextId, isInStatusMap := peerStatus[origin]
-        if !isInStatusMap || vc.NextID > nextId {
-            // Send as RumorMessage all messages that the peer doen't have
-            for msgId := int(nextId); msgId < len(g.messages[origin]); msgId++ {
-                g.sendRumorMessage(g.messages[origin][msgId], false, peerAddr)
-            }
-        }
-    }
 }
 
 

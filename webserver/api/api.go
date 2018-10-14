@@ -21,6 +21,8 @@ func NewApiHandler(gossiper *gossip.Gossiper) *ApiHandler {
 
 func (a *ApiHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
     sendJSON(w, sendFakeJson("fake/messages.json"))
+
+    // TODO
 }
 
 func (a *ApiHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
