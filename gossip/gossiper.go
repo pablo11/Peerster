@@ -65,7 +65,7 @@ func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
 }
 
 func (g *Gossiper) Run(uiPort string) {
-    fmt.Println("==================================================================")
+    //fmt.Println("==================================================================")
 
     go g.listenPeers()
     go g.listenClient(uiPort)
@@ -98,8 +98,6 @@ func (g *Gossiper) listenPeers() {
             //fmt.Println("ERROR:", err)
         }
 
-        //fmt.Println("🥕")
-
         // Store addr in the list of peers if not already present
         g.AddPeer(fromAddr.String())
 
@@ -127,7 +125,6 @@ func (g *Gossiper) listenPeers() {
                 }
 
                 // Send status message to the peer the rumor message was received from
-                //fmt.Println("Send STATUS message")
                 g.sendStatusMessage(fromAddr.String())
 
             case gp.Status != nil:
@@ -188,7 +185,6 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
         statusPeer, exists := g.status[otherStatusPeer.Identifier]
         if exists {
             tmpStatus[otherStatusPeer.Identifier] = true
-            // Check that the NextID are the same
             if otherStatusPeer.NextID > statusPeer.NextID {
                 // The other peer has something more, so send StatusPacket
                 g.sendStatusMessage(fromAddr)
@@ -200,9 +196,8 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
                 return
             }
         } else {
-            // The gossiper has something more, so send rumor of this thing
-            rm := g.messages[otherStatusPeer.Identifier][otherStatusPeer.NextID - 1]
-            g.sendRumorMessage(rm, false, fromAddr)
+            // The other peer has something more, so send status
+            g.sendStatusMessage(fromAddr)
             return
         }
     }
@@ -213,7 +208,7 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
         fmt.Println()
 
         // Flip the coin and stop timer
-        fmt.Println("🥝")
+        //fmt.Println("🥝")
         g.getChannelForPeer(fromAddr) <- sp
         return
     } else {
@@ -239,7 +234,6 @@ func (g *Gossiper) listenClient(uiPort string) {
     packetBuffer := make([]byte, PACKET_BUFFER_LEN)
 
     for {
-        // TODO: clean packetBuffer
         _, _, err := conn.ReadFromUDP(packetBuffer)
         if err != nil {
             fmt.Println(err)
