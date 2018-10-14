@@ -7,7 +7,6 @@ import (
 )
 
 func main() {
-
     uiPort := flag.String("UIPort", "8080", "Port for the UI client (default \"8080\")")
     gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "ip:port for the gossiper (default \"127.0.0.1:5000\")")
     name := flag.String("name", "245351", "Name of the gossiper")

@@ -23,3 +23,7 @@ func (rm *RumorMessage) String(mode, relayAddr string) string {
         return ""
     }
 }
+
+func (rm *RumorMessage) ToJSON() string {
+    return `{"from":"` + rm.Origin + `","msg":"` + rm.Text + `"}`
+}

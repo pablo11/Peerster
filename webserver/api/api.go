@@ -1,11 +1,12 @@
 package api
 
 import (
-    "io/ioutil" // For thesting only
+    //"io/ioutil" // For thesting only
     "fmt"
     "net/http"
-    //"encoding/json"
+    "strings"
     "github.com/pablo11/Peerster/gossip"
+    "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/validator"
 )
 
@@ -20,9 +21,20 @@ func NewApiHandler(gossiper *gossip.Gossiper) *ApiHandler {
 }
 
 func (a *ApiHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
-    sendJSON(w, sendFakeJson("fake/messages.json"))
+    messages := a.gossiper.GetAllMessages()
+    json := strings.Join(mapRumorMessages(messages, func(m *model.RumorMessage) string {
+        return m.ToJSON()
+    }), ",")
 
-    // TODO
+    sendJSON(w, []byte(`[` + json + `]`))
+}
+
+func mapRumorMessages(vs []*model.RumorMessage, f func(*model.RumorMessage) string) []string {
+    vsm := make([]string, len(vs))
+    for i, v := range vs {
+        vsm[i] = f(v)
+    }
+    return vsm
 }
 
 func (a *ApiHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
@@ -37,10 +49,8 @@ func (a *ApiHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
     msg := postedMsg[0]
 
-    fmt.Println("Sending message: " + msg)
-
     // Send message to gossiper
-    go a.gossiper.SendSimpleMessage(msg)
+    go a.gossiper.SendMessage(msg)
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")
@@ -67,8 +77,6 @@ func (a *ApiHandler) AddNode(w http.ResponseWriter, r *http.Request) {
 
     peer := postedNewPeer[0]
 
-    fmt.Println("Adding peer: " + peer)
-
     // Add peer to gossiper
     a.gossiper.AddPeer(peer)
 
@@ -92,24 +100,12 @@ func sendJSON(w http.ResponseWriter, json []byte) {
     w.WriteHeader(200)
     w.Write(json)
 }
-
+/*
 func sendFakeJson(file string) []byte {
     b, err := ioutil.ReadFile(file) // just pass the file name
     if err != nil {
         fmt.Print(err)
     }
     return b
-}
-
-/*
-func (a *ApiHandler) sendMessageToGossiper(msg string) bool {
-    conn, e := net.Dial("udp", a.gossiperAddr)
-	defer conn.Close()
-	if e != nil {
-		fmt.Println(e)
-        return false
-	}
-	conn.Write([]byte(msg))
-    return true
 }
 */

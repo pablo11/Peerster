@@ -37,7 +37,10 @@ type Gossiper struct {
     messagesMutex sync.Mutex
 
     // Channel for wait for acknowledgement event
-    waitStatusChannel map[string]chan *model.StatusPacket
+    waitStatusChannel map[string]chan bool
+
+    // List of every message received to send to the web interface
+    allMessages []*model.RumorMessage
 }
 
 func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
@@ -60,7 +63,7 @@ func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
         nextMessageIdMutex: sync.Mutex{},
         statusMutex: sync.Mutex{},
         messagesMutex: sync.Mutex{},
-        waitStatusChannel: make(map[string]chan *model.StatusPacket),
+        waitStatusChannel: make(map[string]chan bool),
     }
 }
 
@@ -78,6 +81,10 @@ func (g *Gossiper) GetAddress() string {
 
 func (g *Gossiper) GetPeers() []string {
     return g.peers
+}
+
+func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
+    return g.allMessages
 }
 
 func (g *Gossiper) listenPeers() {
@@ -128,9 +135,7 @@ func (g *Gossiper) listenPeers() {
             case gp.Status != nil:
                 g.printGossipPacket("", fromAddr.String(), &gp)
 
-                sp := gp.Status
-
-                g.compareVectorClocks(sp, fromAddr.String())
+                g.compareVectorClocks(gp.Status, fromAddr.String())
 
             default:
                 fmt.Println("WARNING: Unoknown message type")
@@ -156,16 +161,25 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
             if otherStatusPeer.NextID > statusPeer.NextID {
                 // The other peer has something more, so send StatusPacket
                 g.sendStatusMessage(fromAddr)
+
+                // Don't flip the coin and stop timer
+                g.getChannelForPeer(fromAddr) <- false
                 return
             } else if otherStatusPeer.NextID < statusPeer.NextID {
                 // The gossiper has something more, so send rumor of this thing
                 rm := g.messages[otherStatusPeer.Identifier][otherStatusPeer.NextID - 1]
                 g.sendRumorMessage(rm, false, fromAddr)
+
+                // Don't flip the coin and stop timer
+                g.getChannelForPeer(fromAddr) <- false
                 return
             }
         } else {
             // The other peer has something more, so send status
             g.sendStatusMessage(fromAddr)
+
+            // Don't flip the coin and stop timer
+            g.getChannelForPeer(fromAddr) <- false
             return
         }
     }
@@ -176,7 +190,7 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
         fmt.Println()
 
         // Flip the coin and stop timer
-        g.getChannelForPeer(fromAddr) <- sp
+        g.getChannelForPeer(fromAddr) <- true
         return
     } else {
         // The peer vector cannot be longer than the gossiper vector clock, otherwise we don't get here
@@ -185,6 +199,9 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
             if !isVisited {
                 rm := g.messages[key][0]
                 g.sendRumorMessage(rm, false, fromAddr)
+
+                // Don't flip the coin and stop timer
+                g.getChannelForPeer(fromAddr) <- false
                 return
             }
         }
@@ -213,31 +230,35 @@ func (g *Gossiper) listenClient(uiPort string) {
         fmt.Println("CLIENT MESSAGE " + contents)
         fmt.Println()
 
-        if g.simple {
-            go g.SendSimpleMessage(contents)
-        } else {
-            // Build RumorMessage
-            rm := &model.RumorMessage{
-                Origin: g.Name,
-                ID: g.nextMessageId,
-                Text: contents,
-            }
+        g.SendMessage(contents)
+    }
+}
 
-            // Increment messageId
-            g.nextMessageId += 1
-
-            // Add node (self) to the status and messages maps if not already there
-            g.addNewNode(g.Name)
-
-            // Increment vector clock ID for node
-            g.incrementVectorClock(g.Name)
-
-            // Store message
-            g.storeMessage(rm)
-
-            // Rumor RumorMessage
-            g.sendRumorMessage(rm, true, "")
+func (g *Gossiper) SendMessage(contents string) {
+    if g.simple {
+        go g.sendSimpleMessage(contents)
+    } else {
+        // Build RumorMessage
+        rm := &model.RumorMessage{
+            Origin: g.Name,
+            ID: g.nextMessageId,
+            Text: contents,
         }
+
+        // Increment messageId
+        g.nextMessageId += 1
+
+        // Add node (self) to the status and messages maps if not already there
+        g.addNewNode(g.Name)
+
+        // Increment vector clock ID for node
+        g.incrementVectorClock(g.Name)
+
+        // Store message
+        g.storeMessage(rm)
+
+        // Rumor RumorMessage
+        g.sendRumorMessage(rm, true, "")
     }
 }
 
@@ -251,7 +272,7 @@ func (g *Gossiper) startAntiEntropy() {
     }
 }
 
-func (g *Gossiper) SendSimpleMessage(contents string) {
+func (g *Gossiper) sendSimpleMessage(contents string) {
     sm := model.SimpleMessage{
         OriginalName: g.Name,
         RelayPeerAddr: g.address.String(),
@@ -300,11 +321,13 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
     channel := g.getChannelForPeer(fromAddr)
 
     select {
-    case <-channel:
+    case flipCoin := <-channel:
         ticker.Stop()
 
         // If we get ther, it means that the StatusPacket did not acknowledge the RumorMessage
-        g.flipCoin(rm)
+        if flipCoin {
+            g.flipCoin(rm)
+        }
 
     case <-ticker.C:
         ticker.Stop()
@@ -312,10 +335,10 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
     }
 }
 
-func (g *Gossiper) getChannelForPeer(addr string) chan *model.StatusPacket {
+func (g *Gossiper) getChannelForPeer(addr string) chan bool {
     _, channelExists := g.waitStatusChannel[addr]
     if !channelExists {
-        g.waitStatusChannel[addr] = make(chan *model.StatusPacket, 1024)
+        g.waitStatusChannel[addr] = make(chan bool, 1024)
     }
     return g.waitStatusChannel[addr]
 }
@@ -407,6 +430,9 @@ func (g *Gossiper) incrementVectorClock(origin string) {
 
 func (g *Gossiper) storeMessage(rm *model.RumorMessage) {
 	g.messages[rm.Origin] = append(g.messages[rm.Origin], rm)
+
+    // Add message also to allMessages for webserver
+    g.allMessages = append(g.allMessages, rm)
 }
 
 

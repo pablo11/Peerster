@@ -1,10 +1,32 @@
 # Peerster
+---
 
-## CS438 - ecentralized Systems Engineering
+## About
+This is a project for the course "Decentralized Systems Engineering" (CS438) at EPFL, Fall 2018.
 
-Fall 2018
+Author: Pablo Pfister <pablo.pfister@epfl.ch>
 
-Authors: Pablo Pfister
+
+## Contents
+
+#### Homework 1:
+- Simple messages
+- Rumor mongering and anti-entropy
+- Simple GUI
+
+## Run it
+#### The gossiper
+Navigate to the project directory in a terminal and type `go build`. Then type `./Peerster` to launch the gossiper (see homework 1 handout for the options of this command).
+
+#### The client
+Navigate to the `/client` project's subdirectory in a terminal and type `go build`. Then type `./client -UIPort=XXXX -msg=YYYYYY` to launch the client, where `XXXX` is to be replaced with the port your gossiper is listening for the client and `YYYYYY` is to be replaced with the message you want to send.
+
+#### The GUI
+To simplify the usage of this software, one unique command allows to launch a gossiper and a webserver serving the GUI.
+
+Navigate to the `/webserver` project's subdirectory in a terminal and type `go build`. Then type `./webserver` to launch the client, 
+
+
 
 ### Run it
 
