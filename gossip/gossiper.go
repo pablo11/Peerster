@@ -44,9 +44,11 @@ type Gossiper struct {
 
     // Routing table Origin->ip:port
     routingTable map[string]string
+
+    rtimer time.Duration
 }
 
-func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
+func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
     udpAddr := resolveAddress(address)
     udpConn, err := net.ListenUDP("udp4", udpAddr)
     if err != nil {
@@ -67,8 +69,9 @@ func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
         statusMutex: sync.Mutex{},
         messagesMutex: sync.Mutex{},
         waitStatusChannel: make(map[string]chan bool),
-        allMessages: make([]*model.RumorMessage),
+        //allMessages: make([]*model.RumorMessage),
         routingTable: make(map[string]string),
+        rtimer: time.Duration(rtimer),
     }
 }
 
@@ -77,6 +80,8 @@ func (g *Gossiper) Run(uiPort string) {
     go g.listenClient(uiPort)
     if (!g.simple) {
         go g.startAntiEntropy()
+        go g.sendRouteRumorMessage(true)
+        go g.startRouteRumoring()
     }
 }
 
@@ -125,18 +130,20 @@ func (g *Gossiper) listenPeers() {
                 }))
 
             case gp.Rumor != nil:
-                g.printGossipPacket("received", fromAddr.String(), &gp)
+
+                isRouteRumor := gp.Rumor.Text == ""
+
+                if !isRouteRumor {
+                    g.printGossipPacket("received", fromAddr.String(), &gp)
+                }
+
+                g.updateRoutingTable(gp.Rumor, fromAddr.String())
 
                 // If the message is the next one expected, store it
-                if gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
+                if !isRouteRumor && gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
                     g.incrementVectorClock(gp.Rumor.Origin)
                     g.storeMessage(gp.Rumor)
                     g.sendRumorMessage(gp.Rumor, true, fromAddr.String())
-                }
-
-                if gp.Rumor.ID <= g.getVectorClock(gp.Rumor.Origin) {
-                    // Update routing table
-                    g.updateRoutingTable(gp.Rumor.Origin, fromAddr.String())
                 }
 
                 // Send status message to the peer the rumor message was received from
@@ -193,7 +200,12 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
             return
         }
     }
-
+/*
+    fmt.Println("<<<<<<<<<<<<")
+    fmt.Println(sp.Want)
+    fmt.Println(g.status)
+    fmt.Println()
+*/
     if len(sp.Want) == len(g.status) {
         // The two vectors are the same -> we are in sync with the peer
         fmt.Println("IN SYNC WITH " + fromAddr)
@@ -206,7 +218,7 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
         // The peer vector cannot be longer than the gossiper vector clock, otherwise we don't get here
         // Find the first message from tmpStatus to send
         for key, isVisited := range tmpStatus {
-            if !isVisited {
+            if !isVisited && len(g.messages[key]) > 0 {
                 rm := g.messages[key][0]
                 g.sendRumorMessage(rm, false, fromAddr)
 
@@ -282,6 +294,17 @@ func (g *Gossiper) startAntiEntropy() {
     }
 }
 
+func (g *Gossiper) startRouteRumoring() {
+    if g.rtimer == 0 {
+        return
+    }
+
+    for {
+        time.Sleep(g.rtimer * time.Second)
+        g.sendRouteRumorMessage(false)
+    }
+}
+
 func (g *Gossiper) sendSimpleMessage(contents string) {
     sm := model.SimpleMessage{
         OriginalName: g.Name,
@@ -322,6 +345,25 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 
     // Wait for acknowledgement
     go g.waitStatusAcknowledgement(addr, rm)
+}
+
+func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {
+    fmt.Println("🥕 Routing msg " + g.Name)
+
+    rm := model.RumorMessage{
+        Origin: g.Name,
+        ID: g.nextMessageId,
+        Text: "",
+    }
+
+    gp := model.GossipPacket{Rumor: &rm}
+
+    if broadcast {
+        g.sendGossipPacket(&gp, g.peers)
+    } else {
+        randomPeer := g.peers[rand.Intn(len(g.peers))]
+        g.sendGossipPacket(&gp, []string{randomPeer})
+    }
 }
 
 func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMessage) {
@@ -445,10 +487,15 @@ func (g *Gossiper) storeMessage(rm *model.RumorMessage) {
     g.allMessages = append(g.allMessages, rm)
 }
 
-func (g *Gossiper) updateRoutingTable(origin, fromAddr string) {
-    if routingTable[origin] != fromAddr {
-        routingTable[origin] = fromAddr
-        fmt.Println("DSDV " + origin + " " + fromAddr)
+func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
+    if vector, isPresent := g.status[rm.Origin]; isPresent && rm.ID < vector.NextID {
+        return
+    }
+
+    if g.routingTable[rm.Origin] != fromAddr {
+        g.routingTable[rm.Origin] = fromAddr
+        fmt.Println("DSDV " + rm.Origin + " " + fromAddr)
+        fmt.Println()
     }
 }
 
