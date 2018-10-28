@@ -2,7 +2,7 @@ package api
 
 import (
     //"io/ioutil" // For thesting only
-    "fmt"
+    //"fmt"
     "net/http"
     "strings"
     "github.com/pablo11/Peerster/gossip"

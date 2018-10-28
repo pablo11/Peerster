@@ -41,6 +41,9 @@ type Gossiper struct {
 
     // List of every message received to send to the web interface
     allMessages []*model.RumorMessage
+
+    // Routing table Origin->ip:port
+    routingTable map[string]string
 }
 
 func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
@@ -64,6 +67,8 @@ func NewGossiper(address, name string, peers []string, simple bool) *Gossiper {
         statusMutex: sync.Mutex{},
         messagesMutex: sync.Mutex{},
         waitStatusChannel: make(map[string]chan bool),
+        allMessages: make([]*model.RumorMessage),
+        routingTable: make(map[string]string),
     }
 }
 
@@ -127,6 +132,9 @@ func (g *Gossiper) listenPeers() {
                     g.incrementVectorClock(gp.Rumor.Origin)
                     g.storeMessage(gp.Rumor)
                     g.sendRumorMessage(gp.Rumor, true, fromAddr.String())
+
+                    // Update routing table
+                    g.updateRoutingTable(gp.Rumor.Origin, fromAddr.String())
                 }
 
                 // Send status message to the peer the rumor message was received from
@@ -433,6 +441,23 @@ func (g *Gossiper) storeMessage(rm *model.RumorMessage) {
 
     // Add message also to allMessages for webserver
     g.allMessages = append(g.allMessages, rm)
+}
+
+func (g *Gossiper) updateRoutingTable(origin, fromAddr string) {
+    /*
+    if _, alreadyThere = routingTable[origin]; alreadyThere {
+        fmt.Println("DSDV " + origin + " " + fromAddr)
+    }
+    */
+    routingTable[origin] = fromAddr
+
+
+
+    // TODO: do we need to print the DSDV message every time a new rumor message is received or only when the addr is different from before?
+
+
+
+    fmt.Println("DSDV " + origin + " " + fromAddr)
 }
 
 
