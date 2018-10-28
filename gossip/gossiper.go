@@ -132,7 +132,9 @@ func (g *Gossiper) listenPeers() {
                     g.incrementVectorClock(gp.Rumor.Origin)
                     g.storeMessage(gp.Rumor)
                     g.sendRumorMessage(gp.Rumor, true, fromAddr.String())
+                }
 
+                if gp.Rumor.ID <= g.getVectorClock(gp.Rumor.Origin) {
                     // Update routing table
                     g.updateRoutingTable(gp.Rumor.Origin, fromAddr.String())
                 }
@@ -444,20 +446,10 @@ func (g *Gossiper) storeMessage(rm *model.RumorMessage) {
 }
 
 func (g *Gossiper) updateRoutingTable(origin, fromAddr string) {
-    /*
-    if _, alreadyThere = routingTable[origin]; alreadyThere {
+    if routingTable[origin] != fromAddr {
+        routingTable[origin] = fromAddr
         fmt.Println("DSDV " + origin + " " + fromAddr)
     }
-    */
-    routingTable[origin] = fromAddr
-
-
-
-    // TODO: do we need to print the DSDV message every time a new rumor message is received or only when the addr is different from before?
-
-
-
-    fmt.Println("DSDV " + origin + " " + fromAddr)
 }
 
 
