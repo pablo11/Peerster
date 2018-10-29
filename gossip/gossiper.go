@@ -5,7 +5,7 @@ import (
     "log"
     "net"
     "strings"
-    "bytes"
+    //"bytes"
     "sync"
     "math/rand"
     "time"
@@ -76,6 +76,9 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
 }
 
 func (g *Gossiper) Run(uiPort string) {
+    fmt.Println("\033[0;32mGossiper " + g.Name + " started\033[0m")
+    fmt.Println()
+
     go g.listenPeers()
     go g.listenClient(uiPort)
     if (!g.simple) {
@@ -154,6 +157,19 @@ func (g *Gossiper) listenPeers() {
 
                 g.compareVectorClocks(gp.Status, fromAddr.String())
 
+            case gp.Private != nil:
+                if gp.Private.Dest == g.Name {
+                    g.printGossipPacket("", fromAddr.String(), &gp)
+                } else {
+                    // Forward the message and decrease the HopLimit
+                    pm := gp.Private
+                    fmt.Println("🧠 Forwarding private msg dest " + pm.Dest)
+                    if pm.HopLimit > 1 {
+                        pm.HopLimit -= 1
+                        g.sendPrivateMessage(pm)
+                    }
+                }
+
             default:
                 fmt.Println("WARNING: Unoknown message type")
         }
@@ -200,12 +216,7 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
             return
         }
     }
-/*
-    fmt.Println("<<<<<<<<<<<<")
-    fmt.Println(sp.Want)
-    fmt.Println(g.status)
-    fmt.Println()
-*/
+
     if len(sp.Want) == len(g.status) {
         // The two vectors are the same -> we are in sync with the peer
         fmt.Println("IN SYNC WITH " + fromAddr)
@@ -246,13 +257,30 @@ func (g *Gossiper) listenClient(uiPort string) {
             continue
         }
 
+        // Decode the message
+        cm := model.ClientMessage{}
+        err = protobuf.Decode(packetBuffer, &cm)
+        if err != nil {
+            //fmt.Println("ERROR:", err)
+        }
+
+        fmt.Println(cm.String())
+        fmt.Println()
+
         // Prepare contents removing unused bytes
+        /*
         contents := string(bytes.Trim(packetBuffer, "\x00"))
 
         fmt.Println("CLIENT MESSAGE " + contents)
         fmt.Println()
+*/
 
-        g.SendMessage(contents)
+        if cm.Dest == "" {
+            g.SendMessage(cm.Text)
+        } else {
+            pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
+            g.sendPrivateMessage(pm)
+        }
     }
 }
 
@@ -347,9 +375,20 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
     go g.waitStatusAcknowledgement(addr, rm)
 }
 
-func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {
-    fmt.Println("🥕 Routing msg " + g.Name)
+func (g *Gossiper) sendPrivateMessage(pm *model.PrivateMessage) {
+    destPeer, destExists := g.routingTable[pm.Dest]
+    if !destExists {
+        fmt.Println("🤬 Node " + pm.Dest + " not in the reouting table")
+        fmt.Println(g.routingTable)
+        return
+    }
 
+    gp := model.GossipPacket{Private: pm}
+
+    g.sendGossipPacket(&gp, []string{destPeer})
+}
+
+func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {
     rm := model.RumorMessage{
         Origin: g.Name,
         ID: g.nextMessageId,

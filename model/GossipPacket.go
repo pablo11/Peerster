@@ -4,6 +4,7 @@ type GossipPacket struct {
     Simple *SimpleMessage
     Rumor *RumorMessage
     Status *StatusPacket
+    Private *PrivateMessage
 }
 
 func (gp *GossipPacket) String(mode, relayAddr string) string {
@@ -16,6 +17,9 @@ func (gp *GossipPacket) String(mode, relayAddr string) string {
 
         case gp.Status != nil:
             return gp.Status.String(relayAddr)
+
+        case gp.Private != nil:
+            return gp.Private.String()
 
         default:
             return ""
