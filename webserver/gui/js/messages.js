@@ -67,7 +67,7 @@ function getIdentity(onReturn) {
 }
 
 function loadMessages() {
-    $.get("api/message", function(data, status) {
+    $.get("api/messages", function(data, status) {
         console.log("Refreshing messages");
         if (messages.length != data.length) {
             for (var i = messages.length; i < data.length; i++) {

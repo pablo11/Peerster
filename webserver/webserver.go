@@ -18,13 +18,19 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
     a := api.NewApiHandler(g)
 
     // Get the JSON formatted list of messages
-    r.HandleFunc("/api/message", a.GetMessages).Methods("GET")
+    r.HandleFunc("/api/messages", a.GetMessages).Methods("GET")
 
-    // Send a new message
-    r.HandleFunc("/api/message", a.SendMessage).Methods("POST")
+    // Send a new public (broadcast) message
+    r.HandleFunc("/api/sendPublicMessage", a.SendPublicMessage).Methods("POST")
+
+    // Get the list of origins known to this peer
+    r.HandleFunc("/api/origins", a.GetOrigins).Methods("GET")
+
+    // Send a new private message
+    r.HandleFunc("/api/sendPrivateMessage", a.SendPrivateMessage).Methods("POST")
 
     // Get the list of known nodes
-    r.HandleFunc("/api/node", a.GetNodes).Methods("GET")
+    r.HandleFunc("/api/nodes", a.GetNodes).Methods("GET")
 
     // Add a new node to the list of known nodes
     r.HandleFunc("/api/node", a.AddNode).Methods("POST")

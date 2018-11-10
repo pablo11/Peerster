@@ -1,7 +1,6 @@
 package api
 
 import (
-    //"io/ioutil" // For thesting only
     //"fmt"
     "net/http"
     "strings"
@@ -37,7 +36,7 @@ func mapRumorMessages(vs []*model.RumorMessage, f func(*model.RumorMessage) stri
     return vsm
 }
 
-func (a *ApiHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
+func (a *ApiHandler) SendPublicMessage(w http.ResponseWriter, r *http.Request) {
     // Parse POST "msg"
     r.ParseForm()
     postedMsg, isPresent := r.PostForm["msg"]
@@ -51,6 +50,37 @@ func (a *ApiHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
     // Send message to gossiper
     go a.gossiper.SendMessage(msg)
+
+    // Respond to request with ok
+    w.Header().Set("Server", "Cryptop GO server")
+    w.WriteHeader(200)
+}
+
+func (a *ApiHandler) GetOrigins(w http.ResponseWriter, r *http.Request) {
+    jsonOrigins := JsonOrigins{
+        origins: a.gossiper.GetOrigins(),
+    }
+
+    sendJSON(w, jsonOrigins.toByte())
+}
+
+func (a *ApiHandler) SendPrivateMessage(w http.ResponseWriter, r *http.Request) {
+    // Parse POST "msg" and "dest"
+    r.ParseForm()
+    postedMsg, msgIsPresent := r.PostForm["msg"]
+    postedDest, destIsPresent := r.PostForm["dest"]
+    if !msgIsPresent || !destIsPresent || len(postedMsg) != 1 || len(postedDest) != 1 {
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+
+    msg := postedMsg[0]
+    dest := postedDest[0]
+
+    // Send private message
+    pm := model.NewPrivateMessage(a.gossiper.Name, msg, dest)
+    a.gossiper.SendPrivateMessage(pm)
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")
@@ -100,12 +130,3 @@ func sendJSON(w http.ResponseWriter, json []byte) {
     w.WriteHeader(200)
     w.Write(json)
 }
-/*
-func sendFakeJson(file string) []byte {
-    b, err := ioutil.ReadFile(file) // just pass the file name
-    if err != nil {
-        fmt.Print(err)
-    }
-    return b
-}
-*/

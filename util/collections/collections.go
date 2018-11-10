@@ -17,3 +17,11 @@ func Map(vs []string, f func(string) string) []string {
     }
     return vsm
 }
+
+func MapKeys(vs map[string]string) []string {
+    var keys []string
+    for key, _ := range vs {
+        keys = append(keys, key)
+    }
+    return keys
+}

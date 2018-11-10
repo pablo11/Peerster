@@ -50,7 +50,7 @@ function setAddPeerForm() {
 }
 
 function loadAndDisplayPeers() {
-    $.get("api/node", function(data, status) {
+    $.get("api/nodes", function(data, status) {
         const html = data.map(peer => '<a href="#" class="list-group-item">' + peer + '</a>')
         $("#peers-list").html(html)
     })

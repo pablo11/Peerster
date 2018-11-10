@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="author" content="Pablo Pfister" />
+
+    <title>Peerster - 🔏 Private messages</title>
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+
+    <link rel="stylesheet" href="css/margin_padding_helper.css" type="text/css">
+    <link rel="stylesheet" href="css/main.css" type="text/css">
+
+    <!-- jQuery library -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+    <!-- Latest compiled JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <script src="js/privateMessages.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <nav class="navbar navbar-inverse mt-10">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="#">Peerster</a>
+                </div>
+                <ul class="nav navbar-nav">
+                    <li><a href="index.html">Chat</a></li>
+                    <li class="active"><a href="privateMessages.html">Private messages</a></li>
+                    <li><a href="node.html">Node</a></li>
+                    <li><a href="id.html">ID</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Private messages -->
+        <div class="jumbotron">
+            <h3 class="mt-0">Select the destinatary of your messsage:</h3>
+
+            <div class="list-group mb-0" id="origins-list">
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal -->
+    <div id="messageModal" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Send a private message to <span id="modalMessageTo"></span></h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="usr">Message:</label>
+                        <input type="text" class="form-control" id="modal-msg">
+                        <input type="hidden" id="modal-dest" value="">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="sendPrivateMessage" disabled>Send</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

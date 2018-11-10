@@ -15,7 +15,7 @@ function setSendMsgForm() {
         }
 
         // Send message to API
-        $.post("api/message", {
+        $.post("api/sendPublicMessage", {
             msg: msg
         }, function(data, status) {
             console.log("Message sent: ", msg, status);

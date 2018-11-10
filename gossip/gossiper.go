@@ -96,6 +96,10 @@ func (g *Gossiper) GetPeers() []string {
     return g.peers
 }
 
+func (g *Gossiper) GetOrigins() []string {
+    return collections.MapKeys(g.routingTable)
+}
+
 func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
     return g.allMessages
 }
@@ -158,15 +162,15 @@ func (g *Gossiper) listenPeers() {
                 g.compareVectorClocks(gp.Status, fromAddr.String())
 
             case gp.Private != nil:
-                if gp.Private.Dest == g.Name {
+                if gp.Private.Destination == g.Name {
                     g.printGossipPacket("", fromAddr.String(), &gp)
                 } else {
                     // Forward the message and decrease the HopLimit
                     pm := gp.Private
-                    fmt.Println("🧠 Forwarding private msg dest " + pm.Dest)
+                    fmt.Println("🧠 Forwarding private msg dest " + pm.Destination)
                     if pm.HopLimit > 1 {
                         pm.HopLimit -= 1
-                        g.sendPrivateMessage(pm)
+                        g.SendPrivateMessage(pm)
                     }
                 }
 
@@ -279,7 +283,7 @@ func (g *Gossiper) listenClient(uiPort string) {
             g.SendMessage(cm.Text)
         } else {
             pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
-            g.sendPrivateMessage(pm)
+            g.SendPrivateMessage(pm)
         }
     }
 }
@@ -375,10 +379,10 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
     go g.waitStatusAcknowledgement(addr, rm)
 }
 
-func (g *Gossiper) sendPrivateMessage(pm *model.PrivateMessage) {
-    destPeer, destExists := g.routingTable[pm.Dest]
+func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
+    destPeer, destExists := g.routingTable[pm.Destination]
     if !destExists {
-        fmt.Println("🤬 Node " + pm.Dest + " not in the reouting table")
+        fmt.Println("🤬 Node " + pm.Destination + " not in the reouting table")
         fmt.Println(g.routingTable)
         return
     }
