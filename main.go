@@ -4,6 +4,7 @@ import (
     "flag"
     "strings"
     "github.com/pablo11/Peerster/gossip"
+    "github.com/pablo11/Peerster/webserver"
 )
 
 func main() {
@@ -24,6 +25,8 @@ func main() {
 
     g := gossip.NewGossiper(*gossipAddr, *name, peers, *rtimer, *simple)
     g.Run(*uiPort)
+
+    go webserver.CreateAndRun(g, *uiPort)
 
     for {}
 }

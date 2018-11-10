@@ -1,7 +1,8 @@
-package main
+package webserver
 
 import (
     "log"
+    "fmt"
     "net/http"
     "github.com/pablo11/Peerster/gossip"
     "github.com/pablo11/Peerster/webserver/api"
@@ -9,7 +10,10 @@ import (
 )
 
 
-func createWebserverAndRun(g *gossip.Gossiper, webserverPort string) {
+func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
+    fmt.Println("\033[0;32mWebserver listening on localhost:" + webserverPort + "\033[0m")
+    fmt.Println()
+
     r := mux.NewRouter()
     a := api.NewApiHandler(g)
 
@@ -29,7 +33,7 @@ func createWebserverAndRun(g *gossip.Gossiper, webserverPort string) {
     r.HandleFunc("/api/id", a.GetId).Methods("GET")
 
     // Get the html index page
-    r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("gui/"))))
+    r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./webserver/gui/"))))
 
     http.Handle("/", r)
 
