@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Pablo Pfister" />
 
-    <title>Peerster - 📟 Node</title>
+    <title>Peerster - 📄 Share files</title>
 
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
@@ -19,7 +19,7 @@
     <!-- Latest compiled JavaScript -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 
-    <script src="js/node.js"></script>
+    <script src="js/shareFiles.js"></script>
 </head>
 
 <body>
@@ -41,14 +41,15 @@
 
         <!-- CHAT -->
         <div class="jumbotron">
-            <form id="add-peer-form">
+            <form id="add-peer-form" enctype="multipart/form-data">
                 <div class="input-group">
                     <input type="file" class="form-control" id="file">
                     <div class="input-group-btn">
-                        <button class="btn btn-primary" type="submit" id="add-peer-form-submit-btn">Share file</button>
+                        <button class="btn btn-primary" type="submit" id="upload-file-btn">Share file</button>
                     </div>
                 </div>
             </form>
+            <progress></progress>
 
         </div>
 

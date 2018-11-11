@@ -54,7 +54,6 @@ func (fs *FileSharing) IndexFile(path string) {
 
     var metafile []byte
 
-    i := 1
     // Read chunks and build up metafile
     for {
         buffer := make([]byte, MAX_CHUNK_SIZE)
@@ -73,10 +72,6 @@ func (fs *FileSharing) IndexFile(path string) {
         // Add chunk to available chunks
         fs.chunks[hex.EncodeToString(hashBytes)] = buffer[:bytesread]
         metafile = append(metafile, hashBytes...)
-
-
-        fmt.Println(i)
-        i += 1
     }
 
     metaHash := hash(metafile)
@@ -88,14 +83,6 @@ func (fs *FileSharing) IndexFile(path string) {
 }
 
 func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
-    /*
-    _, isAlreadyPresent := fs.downloading[metahash]
-    if isAlreadyPresent {
-        fmt.Println("ALREADY DOWNLOADING THIS PIECE OF DATA")
-        return
-    }
-    */
-
     // Add this file to the downloading map
     fs.downloading[metahash] = &File{
         LocalName: filename,

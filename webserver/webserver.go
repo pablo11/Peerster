@@ -38,6 +38,9 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
     // Get the peer id
     r.HandleFunc("/api/id", a.GetId).Methods("GET")
 
+    // Upload a file
+    r.HandleFunc("/api/uploadFile", a.UploadFile()).Methods("POST")
+
     // Get the html index page
     r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./webserver/gui/"))))
 

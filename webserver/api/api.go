@@ -1,7 +1,13 @@
 package api
 
 import (
-    //"fmt"
+    "fmt"
+    "io/ioutil"
+    "mime"
+    "os"
+    "path/filepath"
+    "crypto/rand"
+
     "net/http"
     "strings"
     "github.com/pablo11/Peerster/gossip"
@@ -129,4 +135,64 @@ func sendJSON(w http.ResponseWriter, json []byte) {
     w.Header().Set("Content-Type", "application/json; charset=utf-8")
     w.WriteHeader(200)
     w.Write(json)
+}
+
+func (a *ApiHandler) UploadFile() http.HandlerFunc {
+    const maxUploadSize = 2 * 1024 // 2 mb
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// validate file size
+		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+            fmt.Println("FILE_TOO_BIG")
+			return
+		}
+
+		// parse and validate file and post parameters
+		file, _, err := r.FormFile("file")
+		if err != nil {
+            fmt.Println("INVALID_FILE")
+            fmt.Print(err)
+			return
+		}
+		defer file.Close()
+		fileBytes, err := ioutil.ReadAll(file)
+		if err != nil {
+            fmt.Println("INVALID_FILE2")
+			return
+		}
+
+		// check file type, detectcontenttype only needs the first 512 bytes
+		filetype := http.DetectContentType(fileBytes)
+		switch filetype {
+		case "image/jpeg", "image/jpg":
+		case "image/gif", "image/png":
+		case "application/pdf":
+			break
+		default:
+            fmt.Println("INVALID_FILE_TYPE")
+			return
+		}
+		fileName := randToken(12)
+		newPath := filepath.Join("_SharedFiles/", fileName+fileEndings[0])
+		fmt.Printf("FileType: %s, File: %s\n", fileType, newPath)
+
+		// write file
+		newFile, err := os.Create(newPath)
+		if err != nil {
+            fmt.Println("CANT_WRITE_FILE")
+			return
+		}
+		defer newFile.Close() // idempotent, okay to call twice
+		if _, err := newFile.Write(fileBytes); err != nil || newFile.Close() != nil {
+            fmt.Println("CANT_WRITE_FILE")
+			return
+		}
+		w.Write([]byte("SUCCESS"))
+	})
+}
+
+func randToken(len int) string {
+	b := make([]byte, len)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)
 }

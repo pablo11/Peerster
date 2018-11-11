@@ -300,7 +300,7 @@ func (g *Gossiper) listenClient(uiPort string) {
             case "downloadFile":
                 fmt.Println("✅ START DOWNLOADING FILE " + cm.File)
                 fmt.Println()
-                g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
+                go g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
         }
     }
 }
