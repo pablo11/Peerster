@@ -76,7 +76,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
 }
 
 func (g *Gossiper) Run(uiPort string) {
-    fmt.Println("\033[0;32mGossiper " + g.Name + " started\033[0m")
+    fmt.Println("\033[0;32mGossiper " + g.Name + " started on " + g.address.String() + "\033[0m")
     fmt.Println()
 
     go g.listenPeers()
@@ -143,6 +143,9 @@ func (g *Gossiper) listenPeers() {
                 if !isRouteRumor {
                     g.printGossipPacket("received", fromAddr.String(), &gp)
                 }
+
+                fmt.Println("🥝 " + fromAddr.String() + " - " + gp.Rumor.Origin)
+                fmt.Println()
 
                 g.updateRoutingTable(gp.Rumor, fromAddr.String())
 
@@ -271,14 +274,6 @@ func (g *Gossiper) listenClient(uiPort string) {
         fmt.Println(cm.String())
         fmt.Println()
 
-        // Prepare contents removing unused bytes
-        /*
-        contents := string(bytes.Trim(packetBuffer, "\x00"))
-
-        fmt.Println("CLIENT MESSAGE " + contents)
-        fmt.Println()
-*/
-
         if cm.Dest == "" {
             g.SendMessage(cm.Text)
         } else {
@@ -382,8 +377,7 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
     destPeer, destExists := g.routingTable[pm.Destination]
     if !destExists {
-        fmt.Println("🤬 Node " + pm.Destination + " not in the reouting table")
-        fmt.Println(g.routingTable)
+        fmt.Println("🤬 Node " + pm.Destination + " not in the routing table")
         return
     }
 
