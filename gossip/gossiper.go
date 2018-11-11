@@ -162,7 +162,7 @@ func (g *Gossiper) listenPeers() {
                 g.sendStatusMessage(fromAddr.String())
 
             case gp.Status != nil:
-                g.printGossipPacket("", fromAddr.String(), &gp)
+                //g.printGossipPacket("", fromAddr.String(), &gp)
 
                 g.compareVectorClocks(gp.Status, fromAddr.String())
 
@@ -234,9 +234,10 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
 
     if len(sp.Want) == len(g.status) {
         // The two vectors are the same -> we are in sync with the peer
+/*
         fmt.Println("IN SYNC WITH " + fromAddr)
         fmt.Println()
-
+*/
         // Flip the coin and stop timer
         g.getChannelForPeer(fromAddr) <- true
         return

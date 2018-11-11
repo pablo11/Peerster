@@ -2,6 +2,8 @@ package model
 
 import (
     "crypto/sha256"
+    "fmt"
+    "encoding/hex"
 )
 
 type DataReply struct {
@@ -16,7 +18,7 @@ func (dr *DataReply) IsValid() bool {
     h := sha256.New()
     h.Write(dr.Data)
     hash := h.Sum(nil)
-    return string(dr.HashValue) == string(hash)
+    return hex.EncodeToString(dr.HashValue) == hex.EncodeToString(hash)
 }
 
 func (dr *DataReply) String(isMetafile bool, filename string, chunkNb int) string {
