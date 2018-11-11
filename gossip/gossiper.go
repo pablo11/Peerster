@@ -46,6 +46,8 @@ type Gossiper struct {
     routingTable map[string]string
 
     rtimer time.Duration
+
+    fileSharing *FileSharing
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -72,12 +74,15 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         //allMessages: make([]*model.RumorMessage),
         routingTable: make(map[string]string),
         rtimer: time.Duration(rtimer),
+        fileSharing: NewFileSharing(),
     }
 }
 
 func (g *Gossiper) Run(uiPort string) {
     fmt.Println("\033[0;32mGossiper " + g.Name + " started on " + g.address.String() + "\033[0m")
     fmt.Println()
+
+    g.fileSharing.SetGossiper(g)
 
     go g.listenPeers()
     go g.listenClient(uiPort)
@@ -144,9 +149,6 @@ func (g *Gossiper) listenPeers() {
                     g.printGossipPacket("received", fromAddr.String(), &gp)
                 }
 
-                fmt.Println("🥝 " + fromAddr.String() + " - " + gp.Rumor.Origin)
-                fmt.Println()
-
                 g.updateRoutingTable(gp.Rumor, fromAddr.String())
 
                 // If the message is the next one expected, store it
@@ -176,6 +178,12 @@ func (g *Gossiper) listenPeers() {
                         g.SendPrivateMessage(pm)
                     }
                 }
+
+            case gp.DataReply != nil:
+                g.fileSharing.HandleDataReply(gp.DataReply)
+
+            case gp.DataRequest != nil:
+                g.fileSharing.HandleDataRequest(gp.DataRequest)
 
             default:
                 fmt.Println("WARNING: Unoknown message type")
@@ -271,14 +279,27 @@ func (g *Gossiper) listenClient(uiPort string) {
             //fmt.Println("ERROR:", err)
         }
 
-        fmt.Println(cm.String())
-        fmt.Println()
+        switch cm.Type {
+            case "msg":
+                fmt.Println(cm.String())
+                fmt.Println()
 
-        if cm.Dest == "" {
-            g.SendMessage(cm.Text)
-        } else {
-            pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
-            g.SendPrivateMessage(pm)
+                if cm.Dest == "" {
+                    g.SendMessage(cm.Text)
+                } else {
+                    pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
+                    g.SendPrivateMessage(pm)
+                }
+
+            case "indexFile":
+                fmt.Println("♻️ INDEXING FILE " + cm.File)
+                fmt.Println()
+                go g.fileSharing.IndexFile(cm.File)
+
+            case "downloadFile":
+                fmt.Println("✅ START DOWNLOADING FILE " + cm.File)
+                fmt.Println()
+                g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
         }
     }
 }
@@ -375,15 +396,23 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 }
 
 func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
-    destPeer, destExists := g.routingTable[pm.Destination]
-    if !destExists {
-        fmt.Println("🤬 Node " + pm.Destination + " not in the routing table")
+    destPeer := g.GetNextHopForDest(pm.Destination)
+    if destPeer == "" {
         return
     }
 
     gp := model.GossipPacket{Private: pm}
 
     g.sendGossipPacket(&gp, []string{destPeer})
+}
+
+func (g *Gossiper) GetNextHopForDest(dest string) string {
+    destPeer, destExists := g.routingTable[dest]
+    if !destExists {
+        fmt.Println("🤬 Node " + dest + " not in the routing table")
+        return ""
+    }
+    return destPeer
 }
 
 func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {

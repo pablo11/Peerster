@@ -14,28 +14,50 @@ func main() {
     dest := flag.String("dest", "", "Destination for the private message")
     file := flag.String("file", "", "File to be indexed by the gossiper")
     msg := flag.String("msg", "", "Message to be sent")
+    request := flag.String("request", "", "Request a chunk or metafile of this hash")
 
     flag.Parse()
 
-    if *file != "" {
-        indexFile("../_SharedFiles/" + *file)
+
+    // Ask to index file
+    if *file != "" && *request == "" {
+        //indexFile("../_SharedFiles/" + *file)
+
+        cm := &model.ClientMessage{
+            Type: "indexFile",
+            File: *file,
+        }
+        sendPacket(cm, *uiPort)
         return
     }
 
-    if *msg == "" {
-        fmt.Println("Please specify a message")
+    // Ask to download file
+    if *file != "" && *request != "" && *dest != "" {
+        cm := &model.ClientMessage{
+            Type: "downloadFile",
+            File: *file,
+            Request: *request,
+            Dest: *dest,
+        }
+        sendPacket(cm, *uiPort)
         return
     }
 
-    sendPacket(*msg, *dest, *uiPort)
+    // Send message
+    if *msg != "" {
+        cm := &model.ClientMessage{
+            Type: "msg",
+            Text: *msg,
+            Dest: *dest,
+        }
+        sendPacket(cm, *uiPort)
+        return
+    }
+
+    fmt.Println("Please provide some parameters")
 }
 
-func sendPacket(msg, dest, uiPort string) {
-    cm := &model.ClientMessage{
-        Text: msg,
-        Dest: dest,
-    }
-
+func sendPacket(cm *model.ClientMessage, uiPort string) {
     packetBytes, err := protobuf.Encode(cm)
     if err != nil {
         fmt.Println(err)
@@ -48,8 +70,4 @@ func sendPacket(msg, dest, uiPort string) {
 		fmt.Println(e)
 	}
 	conn.Write(packetBytes)
-}
-
-func indexFile(path string) {
-    model.NewFile(path)
 }

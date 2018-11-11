@@ -5,6 +5,8 @@ type GossipPacket struct {
     Rumor *RumorMessage
     Status *StatusPacket
     Private *PrivateMessage
+    DataRequest *DataRequest
+    DataReply *DataReply
 }
 
 func (gp *GossipPacket) String(mode, relayAddr string) string {
