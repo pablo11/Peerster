@@ -111,7 +111,7 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
 
 func (g *Gossiper) listenPeers() {
     for {
-        packetBuffer := make([]byte, 2 * PACKET_BUFFER_LEN)
+        packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
         _, fromAddr, err := g.conn.ReadFrom(packetBuffer)
         if err != nil {
             fmt.Println(err)

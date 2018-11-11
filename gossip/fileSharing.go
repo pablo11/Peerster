@@ -53,10 +53,11 @@ func (fs *FileSharing) IndexFile(path string) {
     defer f.Close()
 
     var metafile []byte
-    buffer := make([]byte, MAX_CHUNK_SIZE)
 
+    i := 1
     // Read chunks and build up metafile
     for {
+        buffer := make([]byte, MAX_CHUNK_SIZE)
         bytesread, err := f.Read(buffer)
 
         if err != nil {
@@ -71,13 +72,11 @@ func (fs *FileSharing) IndexFile(path string) {
 
         // Add chunk to available chunks
         fs.chunks[hex.EncodeToString(hashBytes)] = buffer[:bytesread]
-
         metafile = append(metafile, hashBytes...)
 
-        //fmt.Println("BYTES READ:", bytesread)
-        //fmt.Printf("HASH: %x", hashBytes)
-        //fmt.Println()
-        //fmt.Println("\nCHUNK:", string(buffer[:bytesread]))
+
+        fmt.Println(i)
+        i += 1
     }
 
     metaHash := hash(metafile)
@@ -171,7 +170,6 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
                     // The download is complete. Reconstruct the file and save it with the local name
                     fs.reconstructFile(metahash, file.LocalName)
                 } else {
-                    fmt.Println("b")
                     // Request next chunk
                     fs.requestData(dr.Origin, nextChunkHash)
                     fs.downloading[metahash].NextChunkHash = hex.EncodeToString(nextChunkHash)
@@ -184,11 +182,6 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
 }
 
 func (fs *FileSharing) HandleDataRequest(dr *model.DataRequest) {
-    fmt.Println("🈷️")
-
-    fmt.Println(fs.metafiles)
-
-
     // Check if I have the piece of data
     var bytesToSend []byte = nil
     data, isMetafileAvailable := fs.metafiles[hex.EncodeToString(dr.HashValue)]
@@ -202,11 +195,13 @@ func (fs *FileSharing) HandleDataRequest(dr *model.DataRequest) {
     }
 
     if bytesToSend != nil {
+        fmt.Println("🧰 I have it!", hex.EncodeToString(dr.HashValue))
+
         dReply := &model.DataReply{
             Origin: fs.gossiper.Name,
             Destination: dr.Origin,
             HopLimit: 10,
-            HashValue: dr.HashValue,
+            HashValue: hash(bytesToSend),
             Data: bytesToSend,
         }
 
@@ -247,7 +242,7 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
             fmt.Println(err)
             return
         }
-        metafileByteOffset += 32
+        metafileByteOffset += 1
     }
 
     f.Sync()
@@ -276,14 +271,7 @@ func (fs *FileSharing) getChunkHashFromMetafile(metahash string, offset int) []b
         endByteOffset = len(metafile)
     }
 
-    chunkHash := metafile[byteOffset:endByteOffset]
-    if len(chunkHash) > 32 {
-        fmt.Println()
-        fmt.Println("⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️⛔️")
-        fmt.Println()
-        return nil
-    }
-    return chunkHash
+    return metafile[byteOffset:endByteOffset]
 }
 
 
@@ -295,6 +283,8 @@ func (fs *FileSharing) requestData(dest string, hashValue []byte) {
         HopLimit: 10,
         HashValue: hashValue,
     }
+
+    fmt.Println("REQUESTING DATA " + hex.EncodeToString(hashValue))
 
     fs.sendDataRequest(&dr)
 }

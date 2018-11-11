@@ -2,7 +2,6 @@ package model
 
 import (
     "crypto/sha256"
-    "fmt"
     "encoding/hex"
 )
 
@@ -18,6 +17,7 @@ func (dr *DataReply) IsValid() bool {
     h := sha256.New()
     h.Write(dr.Data)
     hash := h.Sum(nil)
+
     return hex.EncodeToString(dr.HashValue) == hex.EncodeToString(hash)
 }
 
