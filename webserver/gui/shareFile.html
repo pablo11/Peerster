@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Pablo Pfister" />
 
-    <title>Peerster - 💬 Chat</title>
+    <title>Peerster - 📟 Node</title>
 
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
@@ -19,7 +19,7 @@
     <!-- Latest compiled JavaScript -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 
-    <script src="js/index.js"></script>
+    <script src="js/node.js"></script>
 </head>
 
 <body>
@@ -30,9 +30,9 @@
                     <a class="navbar-brand" href="#">Peerster</a>
                 </div>
                 <ul class="nav navbar-nav">
-                    <li class="active"><a href="index.html">Chat</a></li>
+                    <li><a href="index.html">Chat</a></li>
                     <li><a href="privateMessages.html">Private messages</a></li>
-                    <li><a href="shareFile.html">Share file</a></li>
+                    <li class="active"><a href="shareFile.html">Share file</a></li>
                     <li><a href="node.html">Node</a></li>
                     <li><a href="id.html">ID</a></li>
                 </ul>
@@ -40,14 +40,12 @@
         </nav>
 
         <!-- CHAT -->
-        <div class="jumbotron chat">
-            <iframe src="messages.html" width="100%" height="400px"></iframe>
-
-            <form id="send-msg-form">
+        <div class="jumbotron">
+            <form id="add-peer-form">
                 <div class="input-group">
-                    <input type="text" class="form-control" id="msg-input" placeholder="Write your message...">
+                    <input type="file" class="form-control" id="file">
                     <div class="input-group-btn">
-                        <button class="btn btn-primary" type="submit" id="send-msg-form-submit-btn">Send</button>
+                        <button class="btn btn-primary" type="submit" id="add-peer-form-submit-btn">Share file</button>
                     </div>
                 </div>
             </form>
