@@ -17,6 +17,11 @@ func main() {
 
     flag.Parse()
 
+    if *file != "" {
+        indexFile("../_SharedFiles/" + *file)
+        return
+    }
+
     if *msg == "" {
         fmt.Println("Please specify a message")
         return
@@ -43,4 +48,8 @@ func sendPacket(msg, dest, uiPort string) {
 		fmt.Println(e)
 	}
 	conn.Write(packetBytes)
+}
+
+func indexFile(path string) {
+    model.NewFile(path)
 }
