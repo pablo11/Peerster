@@ -14,13 +14,31 @@ Author: Pablo Pfister <pablo.pfister@epfl.ch>
 - Rumor mongering and anti-entropy
 - Simple GUI
 
+#### Homework 2:
+- Routing
+- Private messages
+- File sharing (indexing, requesting, sending and downloading)
+
+
 ---
 ## Run it
 #### The gossiper
 Navigate to the project directory in a terminal and type `go build`. Then type `./Peerster` to launch the gossiper (see homework 1 handout for the options of this command).
 
 #### The client
-Navigate to the `/client` project's subdirectory in a terminal and type `go build`. Then type `./client -UIPort=XXXX -msg=YYYYYY` to launch the client, where `XXXX` is to be replaced with the port your gossiper is listening for the client and `YYYYYY` is to be replaced with the message you want to send.
+The client allows multiple interactions:
+- Sending a broadcast message
+- Sending a private message to a peer
+- Indexing a file (the file must be in the \_SharedFiles folder)
+- Requesting a file to another peer
+
+Navigate to the `/client` project's subdirectory in a terminal and type `go build`.
+
+The four features described above can be used with the following commands:
+`./client -UIPort=XXXX -msg=YYYYYY`
+`./client -UIPort=XXXX -msg=YYYYYY -dest=peerName`
+`./client -UIPort=XXXX -file=filename`
+`./client -UIPort=XXXX -file=filename -dest=peerName -reqest=hashOfTheRequestedChunkOrMetafile`
 
 #### The GUI
 The GUI is served by default by this implementation of Peerster on startup.
@@ -37,3 +55,10 @@ To see the GUI simply open a browser window and go at `127.0.0.1:UIPort`, where 
 
 #### The client
 `./client -UIPort=10001 -msg=hello`
+
+
+# TODO
+- Add to the GUI the support for file upload and download
+- Add checks for to big filesize in the indexing
+- Add the timeout of 5 sec if a data request is not replied and send the request again
+- Add support for huge files (don't know how to doit but maybe storing on file chunks and metafiles instead of in memory)
