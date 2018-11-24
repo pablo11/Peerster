@@ -43,13 +43,13 @@
         <div class="jumbotron">
             <form id="add-peer-form" enctype="multipart/form-data">
                 <div class="input-group">
-                    <input type="file" class="form-control" id="file">
+                    <input type="file" name="file" class="form-control" id="file">
                     <div class="input-group-btn">
                         <button class="btn btn-primary" type="submit" id="upload-file-btn">Share file</button>
                     </div>
                 </div>
             </form>
-            <progress></progress>
+            <progress value="0" max="100" id="file-upload-progress-bar" style="width:100%;"></progress>
 
         </div>
 

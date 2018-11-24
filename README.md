@@ -62,3 +62,4 @@ To see the GUI simply open a browser window and go at `127.0.0.1:UIPort`, where 
 - Add checks for to big filesize in the indexing
 - Add the timeout of 5 sec if a data request is not replied and send the request again
 - Add support for huge files (don't know how to doit but maybe storing on file chunks and metafiles instead of in memory)
+- Remove chunks after file reconstruction

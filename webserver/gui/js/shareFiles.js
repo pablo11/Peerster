@@ -3,34 +3,27 @@ $(document).ready(function() {
 })
 
 function setupFileUpload() {
+    $("#file-upload-progress-bar").hide()
+    $("#upload-file-btn").prop("disabled", true)
+
+
     $("#file").on("change", function() {
-        var file = this.files[0];
-        if (file.size > 1024) {
-            alert('Max upload size is 1KB')
-        }
+        $("#upload-file-btn").prop("disabled", false)
     })
 
     $("#upload-file-btn").click(function() {
-        console.log("here")
+        $("#file-upload-progress-bar").show()
         $.ajax({
-            // Your server script to process the upload
             url: '/api/uploadFile',
             type: 'POST',
-
-            // Form data
             data: new FormData($('form')[0]),
-
-            // Tell jQuery not to process data or worry about content-type
-            // You *must* include these options!
             cache: false,
             contentType: false,
             processData: false,
-
-            // Custom XMLHttpRequest
             xhr: function() {
                 var myXhr = $.ajaxSettings.xhr();
                 if (myXhr.upload) {
-                    // For handling the progress of the upload
+                    // Handling the upload progress
                     myXhr.upload.addEventListener('progress', function(e) {
                         if (e.lengthComputable) {
                             $('progress').attr({
@@ -38,10 +31,29 @@ function setupFileUpload() {
                                 max: e.total,
                             });
                         }
-                    } , false);
+                    }, false);
                 }
                 return myXhr;
             }
+        }).done(function(data) {
+            console.log("finished");
+            uploadCompleted("Upload successful")
+        }).fail(function(data) {
+            console.log(data);
+            uploadCompleted("There was an error uploading your file")
         });
+
+        return false;
     })
+}
+
+function uploadCompleted(message) {
+    window.alert(message)
+    $("#file").val("")
+    $('progress').attr({
+        value: 0,
+        max: 100,
+    });
+    $("#upload-file-btn").prop("disabled", true)
+    $("#file-upload-progress-bar").hide()
 }
