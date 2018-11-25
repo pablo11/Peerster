@@ -93,8 +93,7 @@ func (g *Gossiper) Run(uiPort string) {
     go g.listenPeers()
     go g.listenClient(uiPort)
     if (!g.simple) {
-
-        //go g.startAntiEntropy()
+        go g.startAntiEntropy()
         go g.sendRouteRumorMessage(true)
         go g.startRouteRumoring()
     }
@@ -130,6 +129,7 @@ func (g *Gossiper) listenPeers() {
         err = protobuf.Decode(packetBuffer, &gp)
         if err != nil {
             //fmt.Println("ERROR:", err)
+            err = nil
         }
         packetBuffer = nil
 
@@ -290,6 +290,7 @@ func (g *Gossiper) listenClient(uiPort string) {
         err = protobuf.Decode(packetBuffer, &cm)
         if err != nil {
             //fmt.Println("ERROR:", err)
+            err = nil
         }
 
         switch cm.Type {
@@ -474,7 +475,7 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
 func (g *Gossiper) getChannelForPeer(addr string) chan bool {
     _, channelExists := g.waitStatusChannel[addr]
     if !channelExists {
-        g.waitStatusChannel[addr] = make(chan bool, 1024)
+        g.waitStatusChannel[addr] = make(chan bool, 8)
     }
     return g.waitStatusChannel[addr]
 }
@@ -516,6 +517,7 @@ func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) 
     if err != nil {
         fmt.Println("🍎 !!!!!!!!!")
         fmt.Println(err)
+        err = nil
         return
     }
     fmt.Println("🍎 3")

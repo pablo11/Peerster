@@ -1,7 +1,7 @@
 package gossip
 
 import (
-    //"time"
+    "time"
     "fmt"
     "os"
     "io"
@@ -14,6 +14,7 @@ import (
 const MAX_CHUNK_SIZE = 8192 // Chunk size in byte (8KB)
 const SHARED_FILES_DIR = "_SharedFiles/"
 const DOWNLOADS_DIR = "_Downloads/"
+const TIMEOUT_DATA_REQUEST = 5
 var CHUNKS_DIR = "_Chunks/"
 
 type File struct {
@@ -27,11 +28,14 @@ type FileSharing struct {
     gossiper *Gossiper
     // When downloading a file store it here: metaHash->file
     downloading map[string]*File
+    // Mapping from hash to channel for notifying a data reply
+    waitDataRequestChannels map[string]chan bool
 }
 
 func NewFileSharing() *FileSharing{
     return &FileSharing{
         downloading: make(map[string]*File),
+        waitDataRequestChannels: make(map[string]chan bool),
     }
 }
 
@@ -44,6 +48,8 @@ func (fs *FileSharing) SetGossiper(g *Gossiper) {
 }
 
 func (fs *FileSharing) IndexFile(path string) {
+    maxNbChunks := int(MAX_CHUNK_SIZE / 32)
+
     // Open the file
     f, err := os.Open(SHARED_FILES_DIR + path)
     if err != nil {
@@ -67,6 +73,11 @@ func (fs *FileSharing) IndexFile(path string) {
             break
         }
 
+        if (nbChunks >= maxNbChunks) {
+            fmt.Println("WARNING: The file is too large, the max allowed size is 2MB. The file was is partially indexed.", maxNbChunks, nbChunks)
+            break
+        }
+
         // Compute hash of chunk
         hashBytes := hash(buffer[:bytesread])
         err = fs.writeBytesToFile(hex.EncodeToString(hashBytes), buffer[:bytesread])
@@ -79,7 +90,6 @@ func (fs *FileSharing) IndexFile(path string) {
         nbChunks += 1
         buffer = nil
         hashBytes = nil
-        //fmt.Println("Size of metafile:", len(metafile))
     }
 
     metaHash := hash(metafile)
@@ -89,13 +99,9 @@ func (fs *FileSharing) IndexFile(path string) {
     fmt.Println("Number of chunks: ", nbChunks)
     fmt.Println()
 
-    err = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
+    _ = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
     metafile = nil
     metaHash = nil
-    if (err != nil) {
-        return
-    }
-
 }
 
 func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
@@ -150,6 +156,9 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
         return
     }
 
+    // Notify packet received
+    fs.notifyChannelForHash(hex.EncodeToString(dr.HashValue))
+
     file, isDownloading := fs.downloading[hex.EncodeToString(dr.HashValue)]
     if isDownloading && file.MetaHash == nil {
         fmt.Println("DOWNLOADING metafile of " + file.LocalName + " from " + dr.Origin)
@@ -203,13 +212,10 @@ func (fs *FileSharing) HandleDataRequest(dr *model.DataRequest) {
     bytesToSend := fs.readChunkFile(hex.EncodeToString(dr.HashValue))
     if (bytesToSend == nil) {
         fmt.Println("🙁 I don't have it.", hex.EncodeToString(dr.HashValue))
-        return
-    }
-
-    if bytesToSend != nil {
+    } else {
         fmt.Println("🧰 I have it!", hex.EncodeToString(dr.HashValue))
 
-        dReply := &model.DataReply{
+        dReply := model.DataReply{
             Origin: fs.gossiper.Name,
             Destination: dr.Origin,
             HopLimit: 10,
@@ -217,10 +223,9 @@ func (fs *FileSharing) HandleDataRequest(dr *model.DataRequest) {
             Data: bytesToSend,
         }
 
-        fmt.Println("🥕")
+        bytesToSend = nil
 
-        fs.sendDataReply(dReply)
-        dReply = nil
+        fs.sendDataReply(&dReply)
         return
     }
 
@@ -326,6 +331,55 @@ func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
 
     gp := model.GossipPacket{DataRequest: dr}
     fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
+
+    go fs.waitDataReply(dr)
+}
+
+func (fs *FileSharing) getChannelForHash(datahash string) chan bool {
+    _, channelExists := fs.waitDataRequestChannels[datahash]
+    if !channelExists {
+        fs.waitDataRequestChannels[datahash] = make(chan bool)
+    }
+    return fs.waitDataRequestChannels[datahash]
+}
+
+func (fs *FileSharing) removeChannelForHash(datahash string) {
+    _, channelExists := fs.waitDataRequestChannels[datahash]
+    if channelExists {
+        fs.waitDataRequestChannels[datahash] = nil
+        delete(fs.waitDataRequestChannels, datahash)
+    }
+}
+
+func (fs *FileSharing) notifyChannelForHash(datahash string) {
+    _, channelExists := fs.waitDataRequestChannels[datahash]
+    if channelExists {
+        fs.waitDataRequestChannels[datahash] <- true
+    }
+}
+
+func (fs *FileSharing) waitDataReply(dr *model.DataRequest) {
+    ticker := time.NewTicker(TIMEOUT_DATA_REQUEST * time.Second)
+    defer ticker.Stop()
+
+    datahash := hex.EncodeToString(dr.HashValue)
+    channel := fs.getChannelForHash(datahash)
+
+    select {
+    case <-channel:
+        ticker.Stop()
+        fs.removeChannelForHash(datahash)
+        // If we get here it's because the DataReply was received
+
+    case <-ticker.C:
+        ticker.Stop()
+        fs.removeChannelForHash(datahash)
+
+        fmt.Println("🥶 DataRequest timed out, resending request")
+
+        // If we get ther, it means that the DataReply was not received
+        fs.sendDataRequest(dr)
+    }
 }
 
 func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
