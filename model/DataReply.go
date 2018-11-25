@@ -17,8 +17,9 @@ func (dr *DataReply) IsValid() bool {
     h := sha256.New()
     h.Write(dr.Data)
     hash := h.Sum(nil)
-
-    return hex.EncodeToString(dr.HashValue) == hex.EncodeToString(hash)
+    isValid := hex.EncodeToString(dr.HashValue) == hex.EncodeToString(hash)
+    hash = nil
+    return isValid
 }
 
 func (dr *DataReply) String(isMetafile bool, filename string, chunkNb int) string {

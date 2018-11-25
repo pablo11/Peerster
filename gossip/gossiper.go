@@ -6,13 +6,15 @@ import (
     "net"
     "strings"
     //"bytes"
-    "sync"
+    //"sync"
     "math/rand"
     "time"
     "github.com/dedis/protobuf"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/collections"
 )
+
+const DEBUG bool = true
 
 const PACKET_BUFFER_LEN int = 1024
 const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait
@@ -31,10 +33,12 @@ type Gossiper struct {
     messages map[string][]*model.RumorMessage
 
     // Mutex to lock structures on modification
+    /*
     peersMutex sync.Mutex
     nextMessageIdMutex sync.Mutex
     statusMutex sync.Mutex
     messagesMutex sync.Mutex
+    */
 
     // Channel for wait for acknowledgement event
     waitStatusChannel map[string]chan bool
@@ -66,10 +70,12 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         nextMessageId: 1,
         status: make(map[string]*model.PeerStatus),
         messages: make(map[string][]*model.RumorMessage),
+        /*
         peersMutex: sync.Mutex{},
         nextMessageIdMutex: sync.Mutex{},
         statusMutex: sync.Mutex{},
         messagesMutex: sync.Mutex{},
+        */
         waitStatusChannel: make(map[string]chan bool),
         //allMessages: make([]*model.RumorMessage),
         routingTable: make(map[string]string),
@@ -87,7 +93,8 @@ func (g *Gossiper) Run(uiPort string) {
     go g.listenPeers()
     go g.listenClient(uiPort)
     if (!g.simple) {
-        go g.startAntiEntropy()
+
+        //go g.startAntiEntropy()
         go g.sendRouteRumorMessage(true)
         go g.startRouteRumoring()
     }
@@ -124,6 +131,7 @@ func (g *Gossiper) listenPeers() {
         if err != nil {
             //fmt.Println("ERROR:", err)
         }
+        packetBuffer = nil
 
         // Store addr in the list of peers if not already present
         g.AddPeer(fromAddr.String())
@@ -162,7 +170,9 @@ func (g *Gossiper) listenPeers() {
                 g.sendStatusMessage(fromAddr.String())
 
             case gp.Status != nil:
-                g.printGossipPacket("", fromAddr.String(), &gp)
+                if (!DEBUG) {
+                    g.printGossipPacket("", fromAddr.String(), &gp)
+                }
 
                 g.compareVectorClocks(gp.Status, fromAddr.String())
 
@@ -180,6 +190,7 @@ func (g *Gossiper) listenPeers() {
                 }
 
             case gp.DataReply != nil:
+                fmt.Println("🥒 Received data request")
                 g.fileSharing.HandleDataReply(gp.DataReply)
 
             case gp.DataRequest != nil:
@@ -188,7 +199,6 @@ func (g *Gossiper) listenPeers() {
             default:
                 fmt.Println("WARNING: Unoknown message type")
         }
-
     }
 }
 
@@ -234,8 +244,10 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
 
     if len(sp.Want) == len(g.status) {
         // The two vectors are the same -> we are in sync with the peer
-        fmt.Println("IN SYNC WITH " + fromAddr)
-        fmt.Println()
+        if (!DEBUG) {
+            fmt.Println("IN SYNC WITH " + fromAddr)
+            fmt.Println()
+        }
 
         // Flip the coin and stop timer
         g.getChannelForPeer(fromAddr) <- true
@@ -254,6 +266,8 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
             }
         }
     }
+
+    tmpStatus = nil
 }
 
 func (g *Gossiper) listenClient(uiPort string) {
@@ -263,9 +277,8 @@ func (g *Gossiper) listenClient(uiPort string) {
         fmt.Println(err)
     }
 
-    packetBuffer := make([]byte, PACKET_BUFFER_LEN)
-
     for {
+        packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
         _, _, err := conn.ReadFromUDP(packetBuffer)
         if err != nil {
             fmt.Println(err)
@@ -301,6 +314,8 @@ func (g *Gossiper) listenClient(uiPort string) {
                 fmt.Println()
                 go g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
         }
+
+        packetBuffer = nil
     }
 }
 
@@ -309,7 +324,7 @@ func (g *Gossiper) SendMessage(contents string) {
         go g.sendSimpleMessage(contents)
     } else {
         // Build RumorMessage
-        rm := &model.RumorMessage{
+        rm := model.RumorMessage{
             Origin: g.Name,
             ID: g.nextMessageId,
             Text: contents,
@@ -325,10 +340,10 @@ func (g *Gossiper) SendMessage(contents string) {
         g.incrementVectorClock(g.Name)
 
         // Store message
-        g.storeMessage(rm)
+        g.storeMessage(&rm)
 
         // Rumor RumorMessage
-        g.sendRumorMessage(rm, true, "")
+        g.sendRumorMessage(&rm, true, "")
     }
 }
 
@@ -349,7 +364,7 @@ func (g *Gossiper) startRouteRumoring() {
 
     for {
         time.Sleep(g.rtimer * time.Second)
-        g.sendRouteRumorMessage(false)
+        go g.sendRouteRumorMessage(false)
     }
 }
 
@@ -447,9 +462,12 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
             g.flipCoin(rm)
         }
 
+        g.removeChannelForPeer(fromAddr)
+
     case <-ticker.C:
         ticker.Stop()
         g.flipCoin(rm)
+        g.removeChannelForPeer(fromAddr)
     }
 }
 
@@ -459,6 +477,14 @@ func (g *Gossiper) getChannelForPeer(addr string) chan bool {
         g.waitStatusChannel[addr] = make(chan bool, 1024)
     }
     return g.waitStatusChannel[addr]
+}
+
+func (g *Gossiper) removeChannelForPeer(addr string) {
+    _, channelExists := g.waitStatusChannel[addr]
+    if channelExists {
+        g.waitStatusChannel[addr] = nil
+        delete(g.waitStatusChannel, addr)
+    }
 }
 
 func (g *Gossiper) flipCoin(rm *model.RumorMessage) {
@@ -485,16 +511,21 @@ func (g *Gossiper) sendStatusMessage(toPeer string) {
 }
 
 func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) {
+    fmt.Println("🍎 2")
     packetBytes, err := protobuf.Encode(gp)
     if err != nil {
+        fmt.Println("🍎 !!!!!!!!!")
         fmt.Println(err)
         return
     }
+    fmt.Println("🍎 3")
 
     for i := 0; i < len(peersAddr); i++ {
         addr := resolveAddress(peersAddr[i])
         g.conn.WriteToUDP(packetBytes, addr)
     }
+    packetBytes = nil
+    fmt.Println("🍎 4")
 }
 
 func (g *Gossiper) printGossipPacket(mode, relayAddr string, gp *model.GossipPacket) {
