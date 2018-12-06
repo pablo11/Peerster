@@ -71,7 +71,7 @@ do
     name="Node$i"
     nextPeerPort=$(($(($i + 1)) % $NB_NODES + 5000))
 
-    ./Peerster -UIPort=$uiPort -gossipAddr=127.0.0.1:$gossipPort -name=$name -peers=127.0.0.1:$nextPeerPort -rtimer=1 > testOutputs/$name.out &
+    ./Peerster -UIPort=$uiPort -gossipAddr=127.0.0.1:$gossipPort -name=$name -peers=127.0.0.1:$nextPeerPort -rtimer=2 > testOutputs/$name.out &
 done
 
 
@@ -118,13 +118,18 @@ then
     echo "${MAGENTA}Testing Private messages${NC}"
 
     ./client/client -UIPort=10000 -msg=Hey_you,_come_on2!
-    sleep 6
-
-    ./client/client -UIPort=10002 -msg=Hey_you,_come_on! -dest=Node0
-    sleep 6
-
+    sleep 4
     require_text_in_file "CLIENT MESSAGE Hey_you,_come_on2!" "testOutputs/Node0.out" "1"
-    require_text_in_file "PRIVATE origin Node2 hop-limit [0-9]+ contents Hey_you,_come_on!" "testOutputs/Node0.out" "2"
+
+    # Test sending private messages to directly connected nodes
+    ./client/client -UIPort=10003 -msg=Hey_you,_come_on3! -dest=Node2
+    sleep 4
+    require_text_in_file "PRIVATE origin Node3 hop-limit [0-9]+ contents Hey_you,_come_on3!" "testOutputs/Node2.out" "2"
+
+    # Test sending private messages to non directly connected nodes
+    ./client/client -UIPort=10002 -msg=Hey_you,_come_on! -dest=Node0
+    sleep 10
+    require_text_in_file "PRIVATE origin Node2 hop-limit [0-9]+ contents Hey_you,_come_on!" "testOutputs/Node0.out" "3"
 
     pkill -f Peerster
     exit

@@ -53,7 +53,7 @@ func (a *ApiHandler) SendPublicMessage(w http.ResponseWriter, r *http.Request) {
     msg := postedMsg[0]
 
     // Send message to gossiper
-    go a.gossiper.SendMessage(msg)
+    go a.gossiper.SendPublicMessage(msg)
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")

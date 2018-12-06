@@ -84,10 +84,20 @@ if [ $1 = "--test-filesharing" ]
 then
     echo "${MAGENTA}Testing File sharing${NC}"
 
-    ./client/client -UIPort=10000 -file=120chunks.txt
-    sleep 3
-    ./client/client -UIPort=10001 -file=120chunks.txt -dest=Node0 -request=818b03ad01499483cec670451ded6feed2599cb070e965dacac2dd1f1706975b
+    FILENAME="2chunks.txt"
+    METAHASH="3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c"
+    NB_CHUNKS="2"
+    RECONSTRUCTED_FILENAME=$(date +"%T")
+
+    ./client/client -UIPort=10000 -file=$FILENAME
+    sleep 4
+    ./client/client -UIPort=10001 -file=$RECONSTRUCTED_FILENAME -dest=Node0 -request=$METAHASH
     sleep 10
+
+    require_text_in_file "METAHASH: $METAHASH" "testOutputs/Node0.out" "1"
+    require_text_in_file "DOWNLOADING metafile of $RECONSTRUCTED_FILENAME from Node0" "testOutputs/Node1.out" "2"
+    require_text_in_file "DOWNLOADING $RECONSTRUCTED_FILENAME chunk [0-9] from Node0" "testOutputs/Node1.out" "3"
+    require_text_in_file "RECONSTRUCTED file $RECONSTRUCTED_FILENAME" "testOutputs/Node1.out" "4"
 
 
     pkill -f Peerster

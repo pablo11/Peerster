@@ -6,6 +6,7 @@ import (
     "os"
     "io"
     "io/ioutil"
+    "sync"
     "crypto/sha256"
     "encoding/hex"
     "github.com/pablo11/Peerster/model"
@@ -30,12 +31,15 @@ type FileSharing struct {
     downloading map[string]*File
     // Mapping from hash to channel for notifying a data reply
     waitDataRequestChannels map[string]chan bool
+
+    mutex sync.Mutex
 }
 
 func NewFileSharing() *FileSharing{
     return &FileSharing{
         downloading: make(map[string]*File),
         waitDataRequestChannels: make(map[string]chan bool),
+        mutex: sync.Mutex{},
     }
 }
 
@@ -49,9 +53,11 @@ func (fs *FileSharing) SetGossiper(g *Gossiper) {
 
 func (fs *FileSharing) IndexFile(path string) {
     maxNbChunks := int(MAX_CHUNK_SIZE / 32)
+    var err error
+    var f *os.File
 
     // Open the file
-    f, err := os.Open(SHARED_FILES_DIR + path)
+    f, err = os.Open(SHARED_FILES_DIR + path)
     if err != nil {
         fmt.Println("ERROR: Could not open the file " + path)
         fmt.Println(err)
@@ -62,9 +68,11 @@ func (fs *FileSharing) IndexFile(path string) {
     var metafile []byte
     nbChunks := 0
     // Read chunks and build up metafile
+    buffer := make([]byte, MAX_CHUNK_SIZE)
+    bytesread := 0
+    hashBytes := make([]byte, 0)
     for {
-        buffer := make([]byte, MAX_CHUNK_SIZE)
-        bytesread, err := f.Read(buffer)
+        bytesread, err = f.Read(buffer)
 
         if err != nil {
             if err != io.EOF {
@@ -79,7 +87,7 @@ func (fs *FileSharing) IndexFile(path string) {
         }
 
         // Compute hash of chunk
-        hashBytes := hash(buffer[:bytesread])
+        hashBytes = hash(buffer[:bytesread])
         err = fs.writeBytesToFile(hex.EncodeToString(hashBytes), buffer[:bytesread])
         if (err != nil) {
             return
@@ -88,8 +96,6 @@ func (fs *FileSharing) IndexFile(path string) {
         // Add chunk to available chunks
         metafile = append(metafile, hashBytes...)
         nbChunks += 1
-        buffer = nil
-        hashBytes = nil
     }
 
     metaHash := hash(metafile)
@@ -100,8 +106,6 @@ func (fs *FileSharing) IndexFile(path string) {
     fmt.Println()
 
     _ = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
-    metafile = nil
-    metaHash = nil
 }
 
 func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
@@ -336,6 +340,8 @@ func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
 }
 
 func (fs *FileSharing) getChannelForHash(datahash string) chan bool {
+    fs.mutex.Lock()
+    defer fs.mutex.Unlock()
     _, channelExists := fs.waitDataRequestChannels[datahash]
     if !channelExists {
         fs.waitDataRequestChannels[datahash] = make(chan bool)
@@ -392,7 +398,8 @@ func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
     fmt.Println("🍎")
 
     gp := model.GossipPacket{DataReply: dr}
-    fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
+    fmt.Println(dr.Origin + " " + dr.Destination + " " + destPeer)
+    go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
 }
 
 func hash(toHash []byte) []byte {

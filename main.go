@@ -4,7 +4,7 @@ import (
     "flag"
     "strings"
     "github.com/pablo11/Peerster/gossip"
-    //"github.com/pablo11/Peerster/webserver"
+    "github.com/pablo11/Peerster/webserver"
 )
 
 func main() {
@@ -14,6 +14,7 @@ func main() {
     peersParam := flag.String("peers", "", "Comma separated list of peers of the form ip:port")
     rtimer := flag.Int("rtimer", 0, "Route rumors sending period in seconds, 0 to disable")
     simple := flag.Bool("simple", false, "Run gossiper in simple broadcast mode")
+    noGui := flag.Bool("noGUI", false, "If this flag is present, don't run the webserver serving the GUI")
 
     flag.Parse()
 
@@ -26,7 +27,9 @@ func main() {
     g := gossip.NewGossiper(*gossipAddr, *name, peers, *rtimer, *simple)
     g.Run(*uiPort)
 
-    //go webserver.CreateAndRun(g, *uiPort)
+    if !*noGui {
+        go webserver.CreateAndRun(g, *uiPort)
+    }
 
     for {}
 }

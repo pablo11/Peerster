@@ -6,7 +6,7 @@ import (
     "net"
     "strings"
     //"bytes"
-    //"sync"
+    "sync"
     "math/rand"
     "time"
     "github.com/dedis/protobuf"
@@ -14,7 +14,7 @@ import (
     "github.com/pablo11/Peerster/util/collections"
 )
 
-const DEBUG bool = true
+const DEBUG bool = false
 
 const PACKET_BUFFER_LEN int = 1024
 const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait
@@ -33,6 +33,7 @@ type Gossiper struct {
     messages map[string][]*model.RumorMessage
 
     // Mutex to lock structures on modification
+    mutex sync.Mutex
     /*
     peersMutex sync.Mutex
     nextMessageIdMutex sync.Mutex
@@ -70,6 +71,8 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         nextMessageId: 1,
         status: make(map[string]*model.PeerStatus),
         messages: make(map[string][]*model.RumorMessage),
+
+        mutex: sync.Mutex{},
         /*
         peersMutex: sync.Mutex{},
         nextMessageIdMutex: sync.Mutex{},
@@ -116,9 +119,9 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
 }
 
 func (g *Gossiper) listenPeers() {
+    packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
     for {
-        packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
-        _, fromAddr, err := g.conn.ReadFrom(packetBuffer)
+        bytesRead, fromAddr, err := g.conn.ReadFrom(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
@@ -126,12 +129,11 @@ func (g *Gossiper) listenPeers() {
 
         // Decode the message
         gp := model.GossipPacket{}
-        err = protobuf.Decode(packetBuffer, &gp)
+        err = protobuf.Decode(packetBuffer[:bytesRead], &gp)
         if err != nil {
             //fmt.Println("ERROR:", err)
             err = nil
         }
-        packetBuffer = nil
 
         // Store addr in the list of peers if not already present
         g.AddPeer(fromAddr.String())
@@ -178,6 +180,7 @@ func (g *Gossiper) listenPeers() {
 
             case gp.Private != nil:
                 if gp.Private.Destination == g.Name {
+                    // If the private message is for this node, display it
                     g.printGossipPacket("", fromAddr.String(), &gp)
                 } else {
                     // Forward the message and decrease the HopLimit
@@ -190,11 +193,11 @@ func (g *Gossiper) listenPeers() {
                 }
 
             case gp.DataReply != nil:
-                fmt.Println("🥒 Received data request")
-                g.fileSharing.HandleDataReply(gp.DataReply)
+                go g.fileSharing.HandleDataReply(gp.DataReply)
 
             case gp.DataRequest != nil:
-                g.fileSharing.HandleDataRequest(gp.DataRequest)
+                fmt.Println("❤️")
+                go g.fileSharing.HandleDataRequest(gp.DataRequest)
 
             default:
                 fmt.Println("WARNING: Unoknown message type")
@@ -277,9 +280,9 @@ func (g *Gossiper) listenClient(uiPort string) {
         fmt.Println(err)
     }
 
+    packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
     for {
-        packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
-        _, _, err := conn.ReadFromUDP(packetBuffer)
+        bytesRead, _, err := conn.ReadFromUDP(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
@@ -287,7 +290,7 @@ func (g *Gossiper) listenClient(uiPort string) {
 
         // Decode the message
         cm := model.ClientMessage{}
-        err = protobuf.Decode(packetBuffer, &cm)
+        err = protobuf.Decode(packetBuffer[:bytesRead], &cm)
         if err != nil {
             //fmt.Println("ERROR:", err)
             err = nil
@@ -299,10 +302,10 @@ func (g *Gossiper) listenClient(uiPort string) {
                 fmt.Println()
 
                 if cm.Dest == "" {
-                    g.SendMessage(cm.Text)
+                    go g.SendPublicMessage(cm.Text)
                 } else {
                     pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
-                    g.SendPrivateMessage(pm)
+                    go g.SendPrivateMessage(pm)
                 }
 
             case "indexFile":
@@ -311,16 +314,14 @@ func (g *Gossiper) listenClient(uiPort string) {
                 go g.fileSharing.IndexFile(cm.File)
 
             case "downloadFile":
-                fmt.Println("✅ START DOWNLOADING FILE " + cm.File)
+                fmt.Println("✅ START DOWNLOADING FILE " + cm.File + " - " + time.Now().String())
                 fmt.Println()
                 go g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
         }
-
-        packetBuffer = nil
     }
 }
 
-func (g *Gossiper) SendMessage(contents string) {
+func (g *Gossiper) SendPublicMessage(contents string) {
     if g.simple {
         go g.sendSimpleMessage(contents)
     } else {
@@ -378,7 +379,7 @@ func (g *Gossiper) sendSimpleMessage(contents string) {
 
     gp := model.GossipPacket{Simple: &sm}
 
-    g.sendGossipPacket(&gp, g.peers)
+    go g.sendGossipPacket(&gp, g.peers)
 }
 
 // If random is true, addr is used as "not send to this one"
@@ -405,7 +406,7 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 
     g.printGossipPacket("mongering", peer, &gp)
 
-    g.sendGossipPacket(&gp, []string{peer})
+    go g.sendGossipPacket(&gp, []string{peer})
 
     // Wait for acknowledgement
     go g.waitStatusAcknowledgement(addr, rm)
@@ -413,13 +414,14 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 
 func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
     destPeer := g.GetNextHopForDest(pm.Destination)
+    fmt.Println("Sending PRIVATE message 🍿 1 : " + pm.Text + " to " + destPeer)
     if destPeer == "" {
         return
     }
 
     gp := model.GossipPacket{Private: pm}
 
-    g.sendGossipPacket(&gp, []string{destPeer})
+    go g.sendGossipPacket(&gp, []string{destPeer})
 }
 
 func (g *Gossiper) GetNextHopForDest(dest string) string {
@@ -441,10 +443,12 @@ func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {
     gp := model.GossipPacket{Rumor: &rm}
 
     if broadcast {
-        g.sendGossipPacket(&gp, g.peers)
+        go g.sendGossipPacket(&gp, g.peers)
     } else {
-        randomPeer := g.peers[rand.Intn(len(g.peers))]
-        g.sendGossipPacket(&gp, []string{randomPeer})
+        if (len(g.peers) > 0) {
+            randomPeer := g.peers[rand.Intn(len(g.peers))]
+            go g.sendGossipPacket(&gp, []string{randomPeer})
+        }
     }
 }
 
@@ -508,26 +512,25 @@ func (g *Gossiper) sendStatusMessage(toPeer string) {
     sp := model.StatusPacket{Want: wantedList}
     gp := model.GossipPacket{Status: &sp}
 
-    g.sendGossipPacket(&gp, []string{toPeer})
+    go g.sendGossipPacket(&gp, []string{toPeer})
 }
 
 func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) {
-    fmt.Println("🍎 2")
     packetBytes, err := protobuf.Encode(gp)
     if err != nil {
-        fmt.Println("🍎 !!!!!!!!!")
         fmt.Println(err)
         err = nil
         return
     }
-    fmt.Println("🍎 3")
 
     for i := 0; i < len(peersAddr); i++ {
         addr := resolveAddress(peersAddr[i])
-        g.conn.WriteToUDP(packetBytes, addr)
+        if (addr != nil) {
+            if _, err2 := g.conn.WriteToUDP(packetBytes, addr); err2 != nil {
+                fmt.Println(err2)
+            }
+        }
     }
-    packetBytes = nil
-    fmt.Println("🍎 4")
 }
 
 func (g *Gossiper) printGossipPacket(mode, relayAddr string, gp *model.GossipPacket) {
@@ -605,6 +608,7 @@ func resolveAddress(addr string) *net.UDPAddr {
     udpAddr, err := net.ResolveUDPAddr("udp4", addr)
     if err != nil {
         fmt.Println(err)
+        return nil
     }
     return udpAddr
 }
