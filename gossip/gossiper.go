@@ -142,143 +142,36 @@ func (g *Gossiper) listenPeers() {
         // Store addr in the list of peers if not already present
         g.AddPeer(fromAddr.String())
 
-        go g.handleReceivedPacket(gp, fromAddr.String())
+        go g.handlePeerReceivedPacket(&gp, fromAddr.String())
     }
 }
 
-func (g *Gossiper) handleReceivedPacket(gp model.GossipPacket, fromAddrStr string) {
+func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr string) {
     switch {
         case gp.Simple != nil:
-            g.printGossipPacket("peer", "", &gp)
-
-            // Change the relay peer field to this node address
-            receivedFrom := gp.Simple.RelayPeerAddr
-            gp.Simple.RelayPeerAddr = g.address.String()
-
-            // Broadcast the message to every peer except the one the message was received from
-            go g.sendGossipPacket(&gp, collections.Filter(g.peers, func(p string) bool{
-                return p != receivedFrom
-            }))
+            g.HandlePktSimple(gp)
 
         case gp.Rumor != nil:
-
-            isRouteRumor := gp.Rumor.Text == ""
-
-            if !isRouteRumor {
-                g.printGossipPacket("received", fromAddrStr, &gp)
-            }
-
-            g.updateRoutingTable(gp.Rumor, fromAddrStr)
-
-            // If the message is the next one expected, store it
-            if !isRouteRumor && gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
-                g.incrementVectorClock(gp.Rumor.Origin)
-                g.storeMessage(gp.Rumor)
-                g.sendRumorMessage(gp.Rumor, true, fromAddrStr)
-            }
-
-            // Send status message to the peer the rumor message was received from
-            g.sendStatusMessage(fromAddrStr)
+            g.HandlePktRumor(gp, fromAddrStr)
 
         case gp.Status != nil:
-            if (!DEBUG) {
-                g.printGossipPacket("", fromAddrStr, &gp)
-            }
-
-            g.compareVectorClocks(gp.Status, fromAddrStr)
+            g.HandlePktStatus(gp, fromAddrStr)
 
         case gp.Private != nil:
-            if gp.Private.Destination == g.Name {
-                // If the private message is for this node, display it
-                g.printGossipPacket("", fromAddrStr, &gp)
-            } else {
-                // Forward the message and decrease the HopLimit
-                pm := gp.Private
-                fmt.Println("🧠 Forwarding private msg dest " + pm.Destination)
-                if pm.HopLimit > 1 {
-                    pm.HopLimit -= 1
-                    g.SendPrivateMessage(pm)
-                }
-            }
+            g.HandlePktPrivate(gp, fromAddrStr)
 
         case gp.DataReply != nil:
-            go g.fileSharing.HandleDataReply(gp.DataReply)
+            g.fileSharing.HandleDataReply(gp.DataReply)
 
         case gp.DataRequest != nil:
             fmt.Println("❤️")
-            go g.fileSharing.HandleDataRequest(gp.DataRequest)
+            g.fileSharing.HandleDataRequest(gp.DataRequest)
 
         default:
             fmt.Println("WARNING: Unoknown message type")
     }
-}
 
-func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) {
-    // Prepare g.status to compare vactors clocks
-    tmpStatus := make(map[string]bool)
-    for key, _ := range g.status {
-        tmpStatus[key] = false
-    }
-
-    // Compare the two vector clocks
-    for i := 0; i < len(sp.Want); i++ {
-        otherStatusPeer := sp.Want[i]
-
-        statusPeer, exists := g.status[otherStatusPeer.Identifier]
-        if exists {
-            tmpStatus[otherStatusPeer.Identifier] = true
-            if otherStatusPeer.NextID > statusPeer.NextID {
-                // The other peer has something more, so send StatusPacket
-                g.sendStatusMessage(fromAddr)
-
-                // Don't flip the coin and stop timer
-                g.getChannelForPeer(fromAddr) <- false
-                return
-            } else if otherStatusPeer.NextID < statusPeer.NextID {
-                // The gossiper has something more, so send rumor of this thing
-                rm := g.messages[otherStatusPeer.Identifier][otherStatusPeer.NextID - 1]
-                g.sendRumorMessage(rm, false, fromAddr)
-
-                // Don't flip the coin and stop timer
-                g.getChannelForPeer(fromAddr) <- false
-                return
-            }
-        } else {
-            // The other peer has something more, so send status
-            g.sendStatusMessage(fromAddr)
-
-            // Don't flip the coin and stop timer
-            g.getChannelForPeer(fromAddr) <- false
-            return
-        }
-    }
-
-    if len(sp.Want) == len(g.status) {
-        // The two vectors are the same -> we are in sync with the peer
-        if (!DEBUG) {
-            fmt.Println("IN SYNC WITH " + fromAddr)
-            fmt.Println()
-        }
-
-        // Flip the coin and stop timer
-        g.getChannelForPeer(fromAddr) <- true
-        return
-    } else {
-        // The peer vector cannot be longer than the gossiper vector clock, otherwise we don't get here
-        // Find the first message from tmpStatus to send
-        for key, isVisited := range tmpStatus {
-            if !isVisited && len(g.messages[key]) > 0 {
-                rm := g.messages[key][0]
-                g.sendRumorMessage(rm, false, fromAddr)
-
-                // Don't flip the coin and stop timer
-                g.getChannelForPeer(fromAddr) <- false
-                return
-            }
-        }
-    }
-
-    tmpStatus = nil
+    gp = nil
 }
 
 func (g *Gossiper) listenClient(uiPort string) {
@@ -289,8 +182,11 @@ func (g *Gossiper) listenClient(uiPort string) {
     }
 
     packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
+    bytesRead := 0
+    var err error = nil
+
     for {
-        bytesRead, _, err := conn.ReadFromUDP(packetBuffer)
+        bytesRead, _, err = conn.ReadFromUDP(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
