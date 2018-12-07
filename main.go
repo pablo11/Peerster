@@ -33,8 +33,6 @@ func main() {
         go webserver.CreateAndRun(g, *uiPort)
     }
 
-    //for {}
-
     // Kill all goroutines before exiting
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
