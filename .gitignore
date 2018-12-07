@@ -5,3 +5,4 @@ webserver/webserver
 _Chunks/*
 _Downloads/*
 _SharedFiles/*
+!_SharedFiles/*.test
