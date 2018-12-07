@@ -85,7 +85,7 @@ then
     echo "${MAGENTA}Testing File sharing${NC}"
 
     # Test small file
-    FILENAME="2chunks.txt"
+    FILENAME="2chunks.test"
     METAHASH="3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c"
     RECONSTRUCTED_FILENAME=$(date +"%T")
 
@@ -100,7 +100,7 @@ then
     require_text_in_file "RECONSTRUCTED file $RECONSTRUCTED_FILENAME" "testOutputs/Node1.out" "4"
 
     # Test large file
-    FILENAME2="256chunks.txt"
+    FILENAME2="256chunks.test"
     METAHASH2="4d0fbe1a000e3e579a25c19ab7f86eb894c4d21ee28524d818fb0ab52b9b63ec"
     RECONSTRUCTED_FILENAME2="$RECONSTRUCTED_FILENAME-large"
 
