@@ -14,6 +14,8 @@ import (
     "github.com/pablo11/Peerster/util/collections"
 )
 
+const DEBUG bool = false
+
 const PACKET_BUFFER_LEN int = 1024
 const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait
 const ANTI_ENTROPY_PERIOD time.Duration = 2 // Number of seconds to wait
@@ -31,10 +33,13 @@ type Gossiper struct {
     messages map[string][]*model.RumorMessage
 
     // Mutex to lock structures on modification
+    mutex sync.Mutex
+    /*
     peersMutex sync.Mutex
     nextMessageIdMutex sync.Mutex
     statusMutex sync.Mutex
     messagesMutex sync.Mutex
+    */
 
     // Channel for wait for acknowledgement event
     waitStatusChannel map[string]chan bool
@@ -66,10 +71,14 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         nextMessageId: 1,
         status: make(map[string]*model.PeerStatus),
         messages: make(map[string][]*model.RumorMessage),
+
+        mutex: sync.Mutex{},
+        /*
         peersMutex: sync.Mutex{},
         nextMessageIdMutex: sync.Mutex{},
         statusMutex: sync.Mutex{},
         messagesMutex: sync.Mutex{},
+        */
         waitStatusChannel: make(map[string]chan bool),
         //allMessages: make([]*model.RumorMessage),
         routingTable: make(map[string]string),
@@ -110,9 +119,14 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
 }
 
 func (g *Gossiper) listenPeers() {
+    packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
+    bytesRead := 0
+    var fromAddr net.Addr = nil
+    var err error = nil
+    defer g.conn.Close()
+
     for {
-        packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
-        _, fromAddr, err := g.conn.ReadFrom(packetBuffer)
+        bytesRead, fromAddr, err = g.conn.ReadFrom(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
@@ -120,153 +134,60 @@ func (g *Gossiper) listenPeers() {
 
         // Decode the message
         gp := model.GossipPacket{}
-        err = protobuf.Decode(packetBuffer, &gp)
+        err = protobuf.Decode(packetBuffer[:bytesRead], &gp)
         if err != nil {
             //fmt.Println("ERROR:", err)
+            err = nil
         }
 
         // Store addr in the list of peers if not already present
         g.AddPeer(fromAddr.String())
 
-        switch {
-            case gp.Simple != nil:
-                g.printGossipPacket("peer", "", &gp)
-
-                // Change the relay peer field to this node address
-                receivedFrom := gp.Simple.RelayPeerAddr
-                gp.Simple.RelayPeerAddr = g.address.String()
-
-                // Broadcast the message to every peer except the one the message was received from
-                go g.sendGossipPacket(&gp, collections.Filter(g.peers, func(p string) bool{
-                    return p != receivedFrom
-                }))
-
-            case gp.Rumor != nil:
-
-                isRouteRumor := gp.Rumor.Text == ""
-
-                if !isRouteRumor {
-                    g.printGossipPacket("received", fromAddr.String(), &gp)
-                }
-
-                g.updateRoutingTable(gp.Rumor, fromAddr.String())
-
-                // If the message is the next one expected, store it
-                if !isRouteRumor && gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
-                    g.incrementVectorClock(gp.Rumor.Origin)
-                    g.storeMessage(gp.Rumor)
-                    g.sendRumorMessage(gp.Rumor, true, fromAddr.String())
-                }
-
-                // Send status message to the peer the rumor message was received from
-                g.sendStatusMessage(fromAddr.String())
-
-            case gp.Status != nil:
-                g.printGossipPacket("", fromAddr.String(), &gp)
-
-                g.compareVectorClocks(gp.Status, fromAddr.String())
-
-            case gp.Private != nil:
-                if gp.Private.Destination == g.Name {
-                    g.printGossipPacket("", fromAddr.String(), &gp)
-                } else {
-                    // Forward the message and decrease the HopLimit
-                    pm := gp.Private
-                    fmt.Println("🧠 Forwarding private msg dest " + pm.Destination)
-                    if pm.HopLimit > 1 {
-                        pm.HopLimit -= 1
-                        g.SendPrivateMessage(pm)
-                    }
-                }
-
-            case gp.DataReply != nil:
-                g.fileSharing.HandleDataReply(gp.DataReply)
-
-            case gp.DataRequest != nil:
-                g.fileSharing.HandleDataRequest(gp.DataRequest)
-
-            default:
-                fmt.Println("WARNING: Unoknown message type")
-        }
-
+        go g.handlePeerReceivedPacket(&gp, fromAddr.String())
     }
 }
 
-func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) {
-    // Prepare g.status to compare vactors clocks
-    tmpStatus := make(map[string]bool)
-    for key, _ := range g.status {
-        tmpStatus[key] = false
+func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr string) {
+    switch {
+        case gp.Simple != nil:
+            g.HandlePktSimple(gp)
+
+        case gp.Rumor != nil:
+            g.HandlePktRumor(gp, fromAddrStr)
+
+        case gp.Status != nil:
+            g.HandlePktStatus(gp, fromAddrStr)
+
+        case gp.Private != nil:
+            g.HandlePktPrivate(gp, fromAddrStr)
+
+        case gp.DataReply != nil:
+            g.fileSharing.HandleDataReply(gp.DataReply)
+
+        case gp.DataRequest != nil:
+            g.fileSharing.HandleDataRequest(gp.DataRequest)
+
+        default:
+            fmt.Println("WARNING: Unoknown message type")
     }
 
-    // Compare the two vector clocks
-    for i := 0; i < len(sp.Want); i++ {
-        otherStatusPeer := sp.Want[i]
-
-        statusPeer, exists := g.status[otherStatusPeer.Identifier]
-        if exists {
-            tmpStatus[otherStatusPeer.Identifier] = true
-            if otherStatusPeer.NextID > statusPeer.NextID {
-                // The other peer has something more, so send StatusPacket
-                g.sendStatusMessage(fromAddr)
-
-                // Don't flip the coin and stop timer
-                g.getChannelForPeer(fromAddr) <- false
-                return
-            } else if otherStatusPeer.NextID < statusPeer.NextID {
-                // The gossiper has something more, so send rumor of this thing
-                rm := g.messages[otherStatusPeer.Identifier][otherStatusPeer.NextID - 1]
-                g.sendRumorMessage(rm, false, fromAddr)
-
-                // Don't flip the coin and stop timer
-                g.getChannelForPeer(fromAddr) <- false
-                return
-            }
-        } else {
-            // The other peer has something more, so send status
-            g.sendStatusMessage(fromAddr)
-
-            // Don't flip the coin and stop timer
-            g.getChannelForPeer(fromAddr) <- false
-            return
-        }
-    }
-
-    if len(sp.Want) == len(g.status) {
-        // The two vectors are the same -> we are in sync with the peer
-        fmt.Println("IN SYNC WITH " + fromAddr)
-        fmt.Println()
-
-        // Flip the coin and stop timer
-        g.getChannelForPeer(fromAddr) <- true
-        return
-    } else {
-        // The peer vector cannot be longer than the gossiper vector clock, otherwise we don't get here
-        // Find the first message from tmpStatus to send
-        for key, isVisited := range tmpStatus {
-            if !isVisited && len(g.messages[key]) > 0 {
-                rm := g.messages[key][0]
-                g.sendRumorMessage(rm, false, fromAddr)
-
-                // Don't flip the coin and stop timer
-                g.getChannelForPeer(fromAddr) <- false
-                return
-            }
-        }
-    }
+    gp = nil
 }
 
 func (g *Gossiper) listenClient(uiPort string) {
+    var err error = nil
     udpAddr := resolveAddress("127.0.0.1:" + uiPort)
     conn, err := net.ListenUDP("udp4", udpAddr)
     if err != nil {
         fmt.Println(err)
     }
+    defer conn.Close()
 
-    packetBuffer := make([]byte, PACKET_BUFFER_LEN)
+    packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
+    bytesRead := 0
 
     for {
-        _, _, err := conn.ReadFromUDP(packetBuffer)
+        bytesRead, _, err = conn.ReadFromUDP(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
@@ -274,9 +195,10 @@ func (g *Gossiper) listenClient(uiPort string) {
 
         // Decode the message
         cm := model.ClientMessage{}
-        err = protobuf.Decode(packetBuffer, &cm)
+        err = protobuf.Decode(packetBuffer[:bytesRead], &cm)
         if err != nil {
             //fmt.Println("ERROR:", err)
+            err = nil
         }
 
         switch cm.Type {
@@ -285,10 +207,10 @@ func (g *Gossiper) listenClient(uiPort string) {
                 fmt.Println()
 
                 if cm.Dest == "" {
-                    g.SendMessage(cm.Text)
+                    go g.SendPublicMessage(cm.Text)
                 } else {
                     pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
-                    g.SendPrivateMessage(pm)
+                    go g.SendPrivateMessage(pm)
                 }
 
             case "indexFile":
@@ -297,19 +219,19 @@ func (g *Gossiper) listenClient(uiPort string) {
                 go g.fileSharing.IndexFile(cm.File)
 
             case "downloadFile":
-                fmt.Println("✅ START DOWNLOADING FILE " + cm.File)
+                fmt.Println("✅ START DOWNLOADING FILE " + cm.File + " - " + time.Now().String())
                 fmt.Println()
                 go g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
         }
     }
 }
 
-func (g *Gossiper) SendMessage(contents string) {
+func (g *Gossiper) SendPublicMessage(contents string) {
     if g.simple {
         go g.sendSimpleMessage(contents)
     } else {
         // Build RumorMessage
-        rm := &model.RumorMessage{
+        rm := model.RumorMessage{
             Origin: g.Name,
             ID: g.nextMessageId,
             Text: contents,
@@ -325,10 +247,10 @@ func (g *Gossiper) SendMessage(contents string) {
         g.incrementVectorClock(g.Name)
 
         // Store message
-        g.storeMessage(rm)
+        g.storeMessage(&rm)
 
         // Rumor RumorMessage
-        g.sendRumorMessage(rm, true, "")
+        g.sendRumorMessage(&rm, true, "")
     }
 }
 
@@ -349,7 +271,7 @@ func (g *Gossiper) startRouteRumoring() {
 
     for {
         time.Sleep(g.rtimer * time.Second)
-        g.sendRouteRumorMessage(false)
+        go g.sendRouteRumorMessage(false)
     }
 }
 
@@ -362,7 +284,7 @@ func (g *Gossiper) sendSimpleMessage(contents string) {
 
     gp := model.GossipPacket{Simple: &sm}
 
-    g.sendGossipPacket(&gp, g.peers)
+    go g.sendGossipPacket(&gp, g.peers)
 }
 
 // If random is true, addr is used as "not send to this one"
@@ -389,7 +311,7 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 
     g.printGossipPacket("mongering", peer, &gp)
 
-    g.sendGossipPacket(&gp, []string{peer})
+    go g.sendGossipPacket(&gp, []string{peer})
 
     // Wait for acknowledgement
     go g.waitStatusAcknowledgement(addr, rm)
@@ -397,13 +319,14 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 
 func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
     destPeer := g.GetNextHopForDest(pm.Destination)
+    fmt.Println("Sending PRIVATE message 🍿 1 : " + pm.Text + " to " + destPeer)
     if destPeer == "" {
         return
     }
 
     gp := model.GossipPacket{Private: pm}
 
-    g.sendGossipPacket(&gp, []string{destPeer})
+    go g.sendGossipPacket(&gp, []string{destPeer})
 }
 
 func (g *Gossiper) GetNextHopForDest(dest string) string {
@@ -425,10 +348,12 @@ func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {
     gp := model.GossipPacket{Rumor: &rm}
 
     if broadcast {
-        g.sendGossipPacket(&gp, g.peers)
+        go g.sendGossipPacket(&gp, g.peers)
     } else {
-        randomPeer := g.peers[rand.Intn(len(g.peers))]
-        g.sendGossipPacket(&gp, []string{randomPeer})
+        if (len(g.peers) > 0) {
+            randomPeer := g.peers[rand.Intn(len(g.peers))]
+            go g.sendGossipPacket(&gp, []string{randomPeer})
+        }
     }
 }
 
@@ -447,18 +372,29 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
             g.flipCoin(rm)
         }
 
+        g.removeChannelForPeer(fromAddr)
+
     case <-ticker.C:
         ticker.Stop()
         g.flipCoin(rm)
+        g.removeChannelForPeer(fromAddr)
     }
 }
 
 func (g *Gossiper) getChannelForPeer(addr string) chan bool {
     _, channelExists := g.waitStatusChannel[addr]
     if !channelExists {
-        g.waitStatusChannel[addr] = make(chan bool, 1024)
+        g.waitStatusChannel[addr] = make(chan bool, 8)
     }
     return g.waitStatusChannel[addr]
+}
+
+func (g *Gossiper) removeChannelForPeer(addr string) {
+    _, channelExists := g.waitStatusChannel[addr]
+    if channelExists {
+        g.waitStatusChannel[addr] = nil
+        delete(g.waitStatusChannel, addr)
+    }
 }
 
 func (g *Gossiper) flipCoin(rm *model.RumorMessage) {
@@ -481,19 +417,24 @@ func (g *Gossiper) sendStatusMessage(toPeer string) {
     sp := model.StatusPacket{Want: wantedList}
     gp := model.GossipPacket{Status: &sp}
 
-    g.sendGossipPacket(&gp, []string{toPeer})
+    go g.sendGossipPacket(&gp, []string{toPeer})
 }
 
 func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) {
     packetBytes, err := protobuf.Encode(gp)
     if err != nil {
         fmt.Println(err)
+        err = nil
         return
     }
 
     for i := 0; i < len(peersAddr); i++ {
         addr := resolveAddress(peersAddr[i])
-        g.conn.WriteToUDP(packetBytes, addr)
+        if (addr != nil) {
+            if _, err2 := g.conn.WriteToUDP(packetBytes, addr); err2 != nil {
+                fmt.Println(err2)
+            }
+        }
     }
 }
 
@@ -572,6 +513,7 @@ func resolveAddress(addr string) *net.UDPAddr {
     udpAddr, err := net.ResolveUDPAddr("udp4", addr)
     if err != nil {
         fmt.Println(err)
+        return nil
     }
     return udpAddr
 }

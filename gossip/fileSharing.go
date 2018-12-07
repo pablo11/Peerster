@@ -15,7 +15,11 @@ import (
 const MAX_CHUNK_SIZE = 8192 // Chunk size in byte (8KB)
 const SHARED_FILES_DIR = "_SharedFiles/"
 const DOWNLOADS_DIR = "_Downloads/"
+<<<<<<< HEAD
 const TIMEOUT_DATA_REQUEST = 5 // Wait 5 sec before asking again the DataRequest
+=======
+const TIMEOUT_DATA_REQUEST = 5
+>>>>>>> dev
 var CHUNKS_DIR = "_Chunks/"
 
 type File struct {
