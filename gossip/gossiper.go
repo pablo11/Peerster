@@ -123,6 +123,7 @@ func (g *Gossiper) listenPeers() {
     bytesRead := 0
     var fromAddr net.Addr = nil
     var err error = nil
+    defer g.conn.Close()
 
     for {
         bytesRead, fromAddr, err = g.conn.ReadFrom(packetBuffer)
@@ -164,7 +165,6 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
             g.fileSharing.HandleDataReply(gp.DataReply)
 
         case gp.DataRequest != nil:
-            fmt.Println("❤️")
             g.fileSharing.HandleDataRequest(gp.DataRequest)
 
         default:
@@ -175,15 +175,16 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
 }
 
 func (g *Gossiper) listenClient(uiPort string) {
+    var err error = nil
     udpAddr := resolveAddress("127.0.0.1:" + uiPort)
     conn, err := net.ListenUDP("udp4", udpAddr)
     if err != nil {
         fmt.Println(err)
     }
+    defer conn.Close()
 
     packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
     bytesRead := 0
-    var err error = nil
 
     for {
         bytesRead, _, err = conn.ReadFromUDP(packetBuffer)

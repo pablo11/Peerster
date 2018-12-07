@@ -1,6 +1,8 @@
 package main
 
 import (
+    "os"
+    "os/signal"
     "flag"
     "strings"
     "github.com/pablo11/Peerster/gossip"
@@ -31,5 +33,10 @@ func main() {
         go webserver.CreateAndRun(g, *uiPort)
     }
 
-    for {}
+    //for {}
+
+    // Kill all goroutines before exiting
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, os.Kill)
+	<-signalChan
 }
