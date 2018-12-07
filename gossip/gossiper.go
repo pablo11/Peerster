@@ -5,7 +5,6 @@ import (
     "log"
     "net"
     "strings"
-    //"bytes"
     "sync"
     "math/rand"
     "time"
@@ -17,8 +16,8 @@ import (
 const DEBUG bool = false
 
 const PACKET_BUFFER_LEN int = 1024
-const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait
-const ANTI_ENTROPY_PERIOD time.Duration = 2 // Number of seconds to wait
+const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
+const ANTI_ENTROPY_PERIOD time.Duration = 2
 
 type Gossiper struct {
     address *net.UDPAddr
@@ -319,7 +318,6 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
 
 func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
     destPeer := g.GetNextHopForDest(pm.Destination)
-    fmt.Println("Sending PRIVATE message 🍿 1 : " + pm.Text + " to " + destPeer)
     if destPeer == "" {
         return
     }
@@ -332,7 +330,7 @@ func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
 func (g *Gossiper) GetNextHopForDest(dest string) string {
     destPeer, destExists := g.routingTable[dest]
     if !destExists {
-        fmt.Println("🤬 Node " + dest + " not in the routing table")
+        fmt.Println("WARNING: Node " + dest + " not in the routing table")
         return ""
     }
     return destPeer
