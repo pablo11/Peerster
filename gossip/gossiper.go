@@ -120,8 +120,12 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
 
 func (g *Gossiper) listenPeers() {
     packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
+    bytesRead := 0
+    var fromAddr net.Addr = nil
+    var err error = nil
+
     for {
-        bytesRead, fromAddr, err := g.conn.ReadFrom(packetBuffer)
+        bytesRead, fromAddr, err = g.conn.ReadFrom(packetBuffer)
         if err != nil {
             fmt.Println(err)
             continue
@@ -138,70 +142,74 @@ func (g *Gossiper) listenPeers() {
         // Store addr in the list of peers if not already present
         g.AddPeer(fromAddr.String())
 
-        switch {
-            case gp.Simple != nil:
-                g.printGossipPacket("peer", "", &gp)
+        go g.handleReceivedPacket(gp, fromAddr.String())
+    }
+}
 
-                // Change the relay peer field to this node address
-                receivedFrom := gp.Simple.RelayPeerAddr
-                gp.Simple.RelayPeerAddr = g.address.String()
+func (g *Gossiper) handleReceivedPacket(gp model.GossipPacket, fromAddrStr string) {
+    switch {
+        case gp.Simple != nil:
+            g.printGossipPacket("peer", "", &gp)
 
-                // Broadcast the message to every peer except the one the message was received from
-                go g.sendGossipPacket(&gp, collections.Filter(g.peers, func(p string) bool{
-                    return p != receivedFrom
-                }))
+            // Change the relay peer field to this node address
+            receivedFrom := gp.Simple.RelayPeerAddr
+            gp.Simple.RelayPeerAddr = g.address.String()
 
-            case gp.Rumor != nil:
+            // Broadcast the message to every peer except the one the message was received from
+            go g.sendGossipPacket(&gp, collections.Filter(g.peers, func(p string) bool{
+                return p != receivedFrom
+            }))
 
-                isRouteRumor := gp.Rumor.Text == ""
+        case gp.Rumor != nil:
 
-                if !isRouteRumor {
-                    g.printGossipPacket("received", fromAddr.String(), &gp)
+            isRouteRumor := gp.Rumor.Text == ""
+
+            if !isRouteRumor {
+                g.printGossipPacket("received", fromAddrStr, &gp)
+            }
+
+            g.updateRoutingTable(gp.Rumor, fromAddrStr)
+
+            // If the message is the next one expected, store it
+            if !isRouteRumor && gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
+                g.incrementVectorClock(gp.Rumor.Origin)
+                g.storeMessage(gp.Rumor)
+                g.sendRumorMessage(gp.Rumor, true, fromAddrStr)
+            }
+
+            // Send status message to the peer the rumor message was received from
+            g.sendStatusMessage(fromAddrStr)
+
+        case gp.Status != nil:
+            if (!DEBUG) {
+                g.printGossipPacket("", fromAddrStr, &gp)
+            }
+
+            g.compareVectorClocks(gp.Status, fromAddrStr)
+
+        case gp.Private != nil:
+            if gp.Private.Destination == g.Name {
+                // If the private message is for this node, display it
+                g.printGossipPacket("", fromAddrStr, &gp)
+            } else {
+                // Forward the message and decrease the HopLimit
+                pm := gp.Private
+                fmt.Println("🧠 Forwarding private msg dest " + pm.Destination)
+                if pm.HopLimit > 1 {
+                    pm.HopLimit -= 1
+                    g.SendPrivateMessage(pm)
                 }
+            }
 
-                g.updateRoutingTable(gp.Rumor, fromAddr.String())
+        case gp.DataReply != nil:
+            go g.fileSharing.HandleDataReply(gp.DataReply)
 
-                // If the message is the next one expected, store it
-                if !isRouteRumor && gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
-                    g.incrementVectorClock(gp.Rumor.Origin)
-                    g.storeMessage(gp.Rumor)
-                    g.sendRumorMessage(gp.Rumor, true, fromAddr.String())
-                }
+        case gp.DataRequest != nil:
+            fmt.Println("❤️")
+            go g.fileSharing.HandleDataRequest(gp.DataRequest)
 
-                // Send status message to the peer the rumor message was received from
-                g.sendStatusMessage(fromAddr.String())
-
-            case gp.Status != nil:
-                if (!DEBUG) {
-                    g.printGossipPacket("", fromAddr.String(), &gp)
-                }
-
-                g.compareVectorClocks(gp.Status, fromAddr.String())
-
-            case gp.Private != nil:
-                if gp.Private.Destination == g.Name {
-                    // If the private message is for this node, display it
-                    g.printGossipPacket("", fromAddr.String(), &gp)
-                } else {
-                    // Forward the message and decrease the HopLimit
-                    pm := gp.Private
-                    fmt.Println("🧠 Forwarding private msg dest " + pm.Destination)
-                    if pm.HopLimit > 1 {
-                        pm.HopLimit -= 1
-                        g.SendPrivateMessage(pm)
-                    }
-                }
-
-            case gp.DataReply != nil:
-                go g.fileSharing.HandleDataReply(gp.DataReply)
-
-            case gp.DataRequest != nil:
-                fmt.Println("❤️")
-                go g.fileSharing.HandleDataRequest(gp.DataRequest)
-
-            default:
-                fmt.Println("WARNING: Unoknown message type")
-        }
+        default:
+            fmt.Println("WARNING: Unoknown message type")
     }
 }
 

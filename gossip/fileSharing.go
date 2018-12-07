@@ -227,8 +227,6 @@ func (fs *FileSharing) HandleDataRequest(dr *model.DataRequest) {
             Data: bytesToSend,
         }
 
-        bytesToSend = nil
-
         fs.sendDataReply(&dReply)
         return
     }
@@ -253,18 +251,21 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
     defer f.Close()
 
     metafileByteOffset := 0
+    nextChunkHash := make([]byte, 0)
+    chunkToWrite := make([]byte, 0)
     for {
-        nextChunkHash := fs.getChunkHashFromMetafile(metahash, metafileByteOffset)
+        nextChunkHash = nextChunkHash[:0]
+        nextChunkHash = fs.getChunkHashFromMetafile(metahash, metafileByteOffset)
         if nextChunkHash == nil {
             break
         }
 
-        chunkToWrite := fs.readChunkFile(hex.EncodeToString(nextChunkHash))
+        chunkToWrite = fs.readChunkFile(hex.EncodeToString(nextChunkHash))
         if (chunkToWrite == nil) {
             return
         }
 
-        _, err := f.Write(chunkToWrite)
+        _, err = f.Write(chunkToWrite)
         if err != nil {
             fmt.Println("⚠️ ERROR: While writing the file")
             fmt.Println(err)
@@ -334,7 +335,7 @@ func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
     }
 
     gp := model.GossipPacket{DataRequest: dr}
-    fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
+    go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
 
     go fs.waitDataReply(dr)
 }
@@ -400,6 +401,7 @@ func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
     gp := model.GossipPacket{DataReply: dr}
     fmt.Println(dr.Origin + " " + dr.Destination + " " + destPeer)
     go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
+    fmt.Println("🍊")
 }
 
 func hash(toHash []byte) []byte {
