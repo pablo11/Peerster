@@ -2,6 +2,7 @@ package gossip
 
 import (
     "time"
+    "math"
     "fmt"
     "os"
     "io"
@@ -52,7 +53,6 @@ func (fs *FileSharing) SetGossiper(g *Gossiper) {
 }
 
 func (fs *FileSharing) IndexFile(path string) {
-    maxNbChunks := int(MAX_CHUNK_SIZE / 32)
     var err error
     var f *os.File
 
@@ -64,6 +64,20 @@ func (fs *FileSharing) IndexFile(path string) {
         return
     }
     defer f.Close()
+
+    // Check filesize (allow up to maxNbChunks in one single metafile)
+    fi, err2 := f.Stat()
+    if err2 != nil {
+        fmt.Println("ERROR: Could not read file length")
+        fmt.Println(err)
+        return
+    }
+    requiredNbChunks := int(math.Ceil(float64(fi.Size()) / MAX_CHUNK_SIZE))
+    if requiredNbChunks > int(MAX_CHUNK_SIZE / 32) {
+        fmt.Println("ERROR: The file is too large to be indexed")
+        fmt.Println()
+        return
+    }
 
     var metafile []byte
     nbChunks := 0
@@ -78,11 +92,6 @@ func (fs *FileSharing) IndexFile(path string) {
             if err != io.EOF {
                 fmt.Println(err)
             }
-            break
-        }
-
-        if (nbChunks >= maxNbChunks) {
-            fmt.Println("WARNING: The file is too large, the max allowed size is 2MB. The file was is partially indexed.", maxNbChunks, nbChunks)
             break
         }
 

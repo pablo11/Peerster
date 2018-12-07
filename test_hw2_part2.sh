@@ -84,6 +84,7 @@ if [ $1 = "--test-filesharing" ]
 then
     echo "${MAGENTA}Testing File sharing${NC}"
 
+    # Test small file
     FILENAME="2chunks.txt"
     METAHASH="3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c"
     NB_CHUNKS="2"
