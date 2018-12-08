@@ -360,6 +360,8 @@ func (fs *FileSharing) getChannelForHash(datahash string) chan bool {
 }
 
 func (fs *FileSharing) removeChannelForHash(datahash string) {
+    fs.mutex.Lock()
+    defer fs.mutex.Unlock()
     _, channelExists := fs.waitDataRequestChannels[datahash]
     if channelExists {
         fs.waitDataRequestChannels[datahash] = nil
@@ -368,6 +370,8 @@ func (fs *FileSharing) removeChannelForHash(datahash string) {
 }
 
 func (fs *FileSharing) notifyChannelForHash(datahash string) {
+    fs.mutex.Lock()
+    defer fs.mutex.Unlock()
     _, channelExists := fs.waitDataRequestChannels[datahash]
     if channelExists {
         fs.waitDataRequestChannels[datahash] <- true

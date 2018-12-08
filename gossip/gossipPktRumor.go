@@ -13,7 +13,7 @@ func (g *Gossiper) HandlePktRumor(gp *model.GossipPacket, fromAddrStr string) {
     g.updateRoutingTable(gp.Rumor, fromAddrStr)
 
     // If the message is the next one expected, store it
-    if !isRouteRumor && gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
+    if gp.Rumor.ID == g.getVectorClock(gp.Rumor.Origin) {
         g.incrementVectorClock(gp.Rumor.Origin)
         g.storeMessage(gp.Rumor)
         g.sendRumorMessage(gp.Rumor, true, fromAddrStr)

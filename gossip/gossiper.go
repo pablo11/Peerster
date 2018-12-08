@@ -13,11 +13,12 @@ import (
     "github.com/pablo11/Peerster/util/collections"
 )
 
-const DEBUG bool = false
-
-const PACKET_BUFFER_LEN int = 1024
-const ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
-const ANTI_ENTROPY_PERIOD time.Duration = 2
+const (
+    DEBUG bool = false
+    PACKET_BUFFER_LEN int = 1024
+    ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
+    ANTI_ENTROPY_PERIOD time.Duration = 2
+)
 
 type Gossiper struct {
     address *net.UDPAddr
@@ -96,7 +97,7 @@ func (g *Gossiper) Run(uiPort string) {
     go g.listenClient(uiPort)
     if (!g.simple) {
         go g.startAntiEntropy()
-        go g.sendRouteRumorMessage(true)
+        go g.SendPublicMessage("")
         go g.startRouteRumoring()
     }
 }
@@ -270,7 +271,7 @@ func (g *Gossiper) startRouteRumoring() {
 
     for {
         time.Sleep(g.rtimer * time.Second)
-        go g.sendRouteRumorMessage(false)
+        go g.SendPublicMessage("")
     }
 }
 
@@ -334,25 +335,6 @@ func (g *Gossiper) GetNextHopForDest(dest string) string {
         return ""
     }
     return destPeer
-}
-
-func (g *Gossiper) sendRouteRumorMessage(broadcast bool) {
-    rm := model.RumorMessage{
-        Origin: g.Name,
-        ID: g.nextMessageId,
-        Text: "",
-    }
-
-    gp := model.GossipPacket{Rumor: &rm}
-
-    if broadcast {
-        go g.sendGossipPacket(&gp, g.peers)
-    } else {
-        if (len(g.peers) > 0) {
-            randomPeer := g.peers[rand.Intn(len(g.peers))]
-            go g.sendGossipPacket(&gp, []string{randomPeer})
-        }
-    }
 }
 
 func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMessage) {

@@ -53,6 +53,8 @@ To see the GUI simply open a browser window and go at `127.0.0.1:UIPort`, where 
 `./Peerster -rtimer=2 -UIPort=10001 -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002 -name=nodeA -noGUI`
 `./Peerster -rtimer=2 -UIPort=10002 -gossipAddr=127.0.0.1:5002 -peers=127.0.0.1:5001 -name=nodeB -noGUI`
 
+`./Peerster -rtimer=2 -UIPort=10002 -gossipAddr=185.127.206.179:5002 -peers=185.127.206.179:5001`
+
 #### The client
 `./client -UIPort=10001 -msg=hello`
 `./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
