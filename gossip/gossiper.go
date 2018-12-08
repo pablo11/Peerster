@@ -97,7 +97,7 @@ func (g *Gossiper) Run(uiPort string) {
     go g.listenClient(uiPort)
     if (!g.simple) {
         go g.startAntiEntropy()
-        go g.SendPublicMessage("")
+        go g.SendPublicMessage("", false)
         go g.startRouteRumoring()
     }
 }
@@ -207,7 +207,7 @@ func (g *Gossiper) listenClient(uiPort string) {
                 fmt.Println()
 
                 if cm.Dest == "" {
-                    go g.SendPublicMessage(cm.Text)
+                    go g.SendPublicMessage(cm.Text, true)
                 } else {
                     pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
                     go g.SendPrivateMessage(pm)
@@ -226,7 +226,7 @@ func (g *Gossiper) listenClient(uiPort string) {
     }
 }
 
-func (g *Gossiper) SendPublicMessage(contents string) {
+func (g *Gossiper) SendPublicMessage(contents string, storeForGUI bool) {
     if g.simple {
         go g.sendSimpleMessage(contents)
     } else {
@@ -247,7 +247,7 @@ func (g *Gossiper) SendPublicMessage(contents string) {
         g.incrementVectorClock(g.Name)
 
         // Store message
-        g.storeMessage(&rm)
+        g.storeMessage(&rm, storeForGUI)
 
         // Rumor RumorMessage
         g.sendRumorMessage(&rm, true, "")
@@ -271,7 +271,7 @@ func (g *Gossiper) startRouteRumoring() {
 
     for {
         time.Sleep(g.rtimer * time.Second)
-        go g.SendPublicMessage("")
+        go g.SendPublicMessage("", false)
     }
 }
 
@@ -475,11 +475,13 @@ func (g *Gossiper) incrementVectorClock(origin string) {
 	g.status[origin].NextID += 1
 }
 
-func (g *Gossiper) storeMessage(rm *model.RumorMessage) {
+func (g *Gossiper) storeMessage(rm *model.RumorMessage, storeForGUI bool) {
 	g.messages[rm.Origin] = append(g.messages[rm.Origin], rm)
 
-    // Add message also to allMessages for webserver
-    g.allMessages = append(g.allMessages, rm)
+    if storeForGUI {
+        // Add message also to allMessages for webserver
+        g.allMessages = append(g.allMessages, rm)
+    }
 }
 
 func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
