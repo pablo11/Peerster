@@ -7,6 +7,8 @@ type GossipPacket struct {
     Private *PrivateMessage
     DataRequest *DataRequest
     DataReply *DataReply
+    SearchRequest *SearchRequest
+    SearchReply *SearchReply
 }
 
 func (gp *GossipPacket) String(mode, relayAddr string) string {
