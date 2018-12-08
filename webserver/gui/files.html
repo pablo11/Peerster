@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="author" content="Pablo Pfister" />
 
-    <title>Peerster - 📄 Share files</title>
+    <title>Peerster - 📄 Files</title>
 
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
@@ -19,7 +19,7 @@
     <!-- Latest compiled JavaScript -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 
-    <script src="js/shareFiles.js"></script>
+    <script src="js/files.js"></script>
 </head>
 
 <body>
@@ -32,15 +32,16 @@
                 <ul class="nav navbar-nav">
                     <li><a href="index.html">Chat</a></li>
                     <li><a href="privateMessages.html">Private messages</a></li>
-                    <li class="active"><a href="shareFile.html">Share file</a></li>
+                    <li class="active"><a href="files.html">Files</a></li>
                     <li><a href="node.html">Node</a></li>
                     <li><a href="id.html">ID</a></li>
                 </ul>
             </div>
         </nav>
 
-        <!-- CHAT -->
+        <!-- SHARE FILE -->
         <div class="jumbotron">
+            <h2>Share a file</h2>
             <form id="add-peer-form" enctype="multipart/form-data">
                 <div class="input-group">
                     <input type="file" name="file" class="form-control" id="file">
@@ -50,7 +51,13 @@
                 </div>
             </form>
             <progress value="0" max="100" id="file-upload-progress-bar" style="width:100%;"></progress>
+        </div>
 
+        <!-- AVAILABLE FILES -->
+        <div class="jumbotron">
+            <h2>Available files</h2>
+            <div class="list-group" id="listFiles">
+            </div>
         </div>
 
     </div>

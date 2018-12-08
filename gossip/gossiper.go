@@ -14,7 +14,7 @@ import (
 )
 
 const (
-    DEBUG bool = false
+    DEBUG bool = true
     PACKET_BUFFER_LEN int = 1024
     ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
     ANTI_ENTROPY_PERIOD time.Duration = 2
@@ -309,7 +309,9 @@ func (g *Gossiper) sendRumorMessage(rm *model.RumorMessage, random bool, addr st
     // Send him the packet
     gp := model.GossipPacket{Rumor: rm}
 
-    g.printGossipPacket("mongering", peer, &gp)
+    if (!DEBUG) {
+        g.printGossipPacket("mongering", peer, &gp)
+    }
 
     go g.sendGossipPacket(&gp, []string{peer})
 
@@ -362,6 +364,8 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
 }
 
 func (g *Gossiper) getChannelForPeer(addr string) chan bool {
+    g.mutex.Lock()
+    defer g.mutex.Unlock()
     _, channelExists := g.waitStatusChannel[addr]
     if !channelExists {
         g.waitStatusChannel[addr] = make(chan bool, 8)
@@ -370,6 +374,8 @@ func (g *Gossiper) getChannelForPeer(addr string) chan bool {
 }
 
 func (g *Gossiper) removeChannelForPeer(addr string) {
+    g.mutex.Lock()
+    defer g.mutex.Unlock()
     _, channelExists := g.waitStatusChannel[addr]
     if channelExists {
         g.waitStatusChannel[addr] = nil
@@ -382,7 +388,9 @@ func (g *Gossiper) flipCoin(rm *model.RumorMessage) {
         if len(g.peers) > 0 {
             randomPeer := g.peers[rand.Intn(len(g.peers))]
             g.sendRumorMessage(rm, false, randomPeer)
-            fmt.Println("FLIPPED COIN sending rumor to " + randomPeer)
+            if (!DEBUG) {
+                fmt.Println("FLIPPED COIN sending rumor to " + randomPeer)
+            }
         }
     }
 }

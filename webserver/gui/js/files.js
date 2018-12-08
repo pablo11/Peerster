@@ -1,6 +1,24 @@
 $(document).ready(function() {
+    listFiles()
     setupFileUpload()
 })
+
+function listFiles() {
+    $.get("api/listFiles", function(data, status) {
+        console.log(data);
+        displayListedFiles(data)
+    })
+}
+
+function displayListedFiles(files) {
+    var html = ""
+    for (var f of files) {
+        const b64pth = btoa(f.path)
+        html += '<a href="/api/downloadFile?path=' + b64pth + '" target="_blank" class="list-group-item">' + f.name + '</a>'
+    }
+
+    $("#listFiles").html(html)
+}
 
 function setupFileUpload() {
     $("#file-upload-progress-bar").hide()
