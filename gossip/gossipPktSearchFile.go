@@ -1,9 +1,12 @@
 package gossip
 
 import (
+    "fmt"
     "time"
     "strings"
+    "math/rand"
     "github.com/pablo11/Peerster/model"
+    "github.com/pablo11/Peerster/util/collections"
 )
 
 func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
@@ -34,10 +37,20 @@ func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
     }
 
     // Subtract 1 from the request's budget
-
+    sr.Budget -= 1
 
     // If request's budget is greater than zero redistribute requests to neighbors
+    if sr.Budget <= 0 {
+        return
+    }
 
+    // Propagate the SearchRequest subdividing the budget
+    peersBudget := g.subdivideBudget(sr.Budget)
+    if len(peersBudget) > 0 {
+        for peerAddr, peerBudget := range peersBudget {
+            go g.sendSearchRequest(peerAddr, sr.Origin, peerBudget, sr.Keywords)
+        }
+    }
 }
 
 // Returns a boolean indicating if the request is a duplicate
@@ -82,6 +95,63 @@ func (g *Gossiper) sendSearchReply(dest string, results []*model.SearchResult) {
 
     gp := model.GossipPacket{SearchReply: &sr}
     go g.sendGossipPacket(&gp, []string{destPeer})
+}
+
+func (g *Gossiper) sendSearchRequest(destPeer, origin string, budget uint64, keywords []string) {
+    sr := model.SearchRequest{
+        Origin: origin,
+        Budget: budget,
+        Keywords: keywords,
+    }
+
+    gp := model.GossipPacket{SearchRequest: &sr}
+    go g.sendGossipPacket(&gp, []string{destPeer})
+}
+
+func (g *Gossiper) subdivideBudget(budget uint64) map[string]uint64 {
+    peersBudget := make(map[string]uint64)
+    nbPeers := uint64(len(g.peers))
+    if nbPeers < 1 {
+        return peersBudget
+    }
+
+    if budget > nbPeers {
+        // Divide the budget among all peers
+        minBudgetPerPeer := budget / nbPeers
+        for _, p := range g.peers {
+            peersBudget[p] = minBudgetPerPeer
+        }
+
+        for _, p := range g.getNRandomPeers(budget - minBudgetPerPeer * nbPeers) {
+            peersBudget[p] += 1
+        }
+    } else {
+        // Select budget peers at random and send them 1 unit of budget
+        for _, p := range g.getNRandomPeers(budget) {
+            peersBudget[p] = 1
+        }
+    }
+    return peersBudget
+}
+
+func (g *Gossiper) getNRandomPeers(n uint64) []string {
+    if len(g.peers) < int(n) {
+        fmt.Println("ERROR: not enough peers to select " + string(n) + " at random")
+        return make([]string, 0)
+    }
+    tmpPeers := g.peers
+    randomPeers := make([]string, int(n))
+
+    for i := 0; i < int(n); i++ {
+        randomPeer := tmpPeers[rand.Intn(len(tmpPeers))]
+        randomPeers = append(randomPeers, randomPeer)
+
+        tmpPeers = collections.Filter(tmpPeers, func(p string) bool{
+            return p != randomPeer
+        })
+    }
+
+    return randomPeers
 }
 
 func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
