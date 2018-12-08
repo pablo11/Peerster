@@ -9,6 +9,12 @@ import (
     "github.com/pablo11/Peerster/util/collections"
 )
 
+type ActiveSearch struct {
+    Keywords []string
+    LastBudget uint64
+    NotifyChannel chan bool
+}
+
 func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
     sr := gp.SearchRequest
     // Discard SearchRequest if it's a duplicate
@@ -33,7 +39,7 @@ func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
 
     // Send a SearchReply if at least one file matches the SearchRequest
     if len(searchResults) > 0 {
-        go g.sendSearchReply(sr.Origin, searchResults)
+        go g.sendSearchReplyFor(sr.Origin, searchResults)
     }
 
     // Subtract 1 from the request's budget
@@ -48,7 +54,7 @@ func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
     peersBudget := g.subdivideBudget(sr.Budget)
     if len(peersBudget) > 0 {
         for peerAddr, peerBudget := range peersBudget {
-            go g.sendSearchRequest(peerAddr, sr.Origin, peerBudget, sr.Keywords)
+            go g.sendSearchRequest(sr.Origin, peerBudget, sr.Keywords, peerAddr, false)
         }
     }
 }
@@ -80,12 +86,7 @@ func (g *Gossiper) checkDuplicateSearchRequests(sr *model.SearchRequest) bool {
     return false
 }
 
-func (g *Gossiper) sendSearchReply(dest string, results []*model.SearchResult) {
-    destPeer := g.GetNextHopForDest(dest)
-    if destPeer == "" {
-        return
-    }
-
+func (g *Gossiper) sendSearchReplyFor(dest string, results []*model.SearchResult) {
     sr := model.SearchReply{
         Origin: g.Name,
         Destination: dest,
@@ -93,11 +94,24 @@ func (g *Gossiper) sendSearchReply(dest string, results []*model.SearchResult) {
         Results: results,
     }
 
-    gp := model.GossipPacket{SearchReply: &sr}
+    g.sendSearchReply(&sr)
+}
+
+func (g *Gossiper) sendSearchReply(sr *model.SearchReply) {
+    destPeer := g.GetNextHopForDest(sr.Destination)
+    if destPeer == "" {
+        return
+    }
+    gp := model.GossipPacket{SearchReply: sr}
     go g.sendGossipPacket(&gp, []string{destPeer})
 }
 
-func (g *Gossiper) sendSearchRequest(destPeer, origin string, budget uint64, keywords []string) {
+func (g *Gossiper) sendSearchRequest(origin string, budget uint64, keywords []string, destPeer string, randomPeer bool) {
+    peer := destPeer
+    if randomPeer {
+        peer = g.getNRandomPeers(1)[0]
+    }
+
     sr := model.SearchRequest{
         Origin: origin,
         Budget: budget,
@@ -105,7 +119,7 @@ func (g *Gossiper) sendSearchRequest(destPeer, origin string, budget uint64, key
     }
 
     gp := model.GossipPacket{SearchRequest: &sr}
-    go g.sendGossipPacket(&gp, []string{destPeer})
+    go g.sendGossipPacket(&gp, []string{peer})
 }
 
 func (g *Gossiper) subdivideBudget(budget uint64) map[string]uint64 {
@@ -154,6 +168,81 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
     return randomPeers
 }
 
+/*
+type ActiveSearch struct {
+    Keywords []string
+    LastBudget uint64
+    NotifyChannel: chan
+}
+*/
+
+func (g *Gossiper) startSearchRequest(budget uint64, keywords []string) {
+    activeSearchUid := strings.Join(keywords, ",")
+
+    g.mutex.Lock()
+    defer g.mutex.Unlock()
+
+    activeSearch, alreadySearching := g.ActiveSearchRequests[activeSearchUid]
+    if alreadySearching && activeSearch.LastBudget >= budget {
+        fmt.Println("WARNING: The SearchRequest is already beeing searched")
+        return
+    }
+
+    g.ActiveSearchRequests[activeSearchUid] = &ActiveSearch{
+        Keywords: keywords,
+        LastBudget: budget,
+        NotifyChannel: make(chan bool),
+    }
+
+    go g.sendSearchRequest(g.Name, budget, keywords, "", true)
+
+    // Keep record of SearchRequests sent until 2 mathces are got, in the meantime
+    // every 1 second double the budget and sent a new request (up to a threshold of 32)
+
+    ticker := time.NewTicker(SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD * time.Second)
+    defer ticker.Stop()
+
+    select {
+    case <-g.ActiveSearchRequests[activeSearchUid].NotifyChannel:
+        // Match threshold reached, print
+        ticker.Stop()
+        delete(g.ActiveSearchRequests, activeSearchUid)
+
+        fmt.Println("✅ 2 MATHCHES")
+
+        return
+
+    case <-ticker.C:
+        // Send a new SearchRequest doubling budget if smaller than MAX_SEARCH_BUDGET
+        ticker.Stop()
+
+        if budget >= MAX_SEARCH_BUDGET {
+            fmt.Println("⛔️ MAX BUDGET REACHED")
+            return
+        }
+
+        go g.startSearchRequest(budget * 2, keywords)
+    }
+}
+
 func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
+    sr := gp.SearchReply
+    // Forward pkts not for me
+    if sr.Destination != g.Name {
+        fmt.Println("Forwarding DataRequest packet to " + sr.Destination)
+        if sr.HopLimit > 1 {
+            sr.HopLimit -= 1
+            g.sendSearchReply(sr)
+        }
+        return
+    }
+
+
+
+    // Handle Reply: check if it's for an active search request
+
+
+
+
 
 }

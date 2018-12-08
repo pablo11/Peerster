@@ -19,6 +19,8 @@ const (
     ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
     ANTI_ENTROPY_PERIOD time.Duration = 2
     SEARCH_REQUEST_DUPLICATE_PERIOD time.Duration = 500 // Milliseconds to wait before considering new SearchRequest as not duplicate
+    SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD time.Duration = 1
+    MAX_SEARCH_BUDGET uint64 = 32
 )
 
 type Gossiper struct {
@@ -51,6 +53,9 @@ type Gossiper struct {
 
     // Array containing SearchRequest uid received in the last 0.5 seconds
     ProcessingSearchRequests map[string]bool
+
+    // Keep track of current SearchRequests
+    ActiveSearchRequests map[string]*ActiveSearch
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -78,6 +83,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         rtimer: time.Duration(rtimer),
         FileSharing: NewFileSharing(),
         ProcessingSearchRequests: make(map[string]bool),
+        ActiveSearchRequests: make(map[string]*ActiveSearch),
     }
 }
 
