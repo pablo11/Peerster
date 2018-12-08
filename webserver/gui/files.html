@@ -41,7 +41,7 @@
 
         <!-- SHARE FILE -->
         <div class="jumbotron">
-            <h2>Share a file</h2>
+            <h2 class="mt-0">Share a file</h2>
             <form id="add-peer-form" enctype="multipart/form-data">
                 <div class="input-group">
                     <input type="file" name="file" class="form-control" id="file">
@@ -53,10 +53,23 @@
             <progress value="0" max="100" id="file-upload-progress-bar" style="width:100%;"></progress>
         </div>
 
+        <!-- SEARCH FILES -->
+        <div class="jumbotron">
+            <h2 class="mt-0">Search files</h2>
+            <form id="add-peer-form" enctype="multipart/form-data">
+                <div class="input-group">
+                    <input type="text" name="searchQuery" class="form-control" id="searchQuery" placeholder="*password*">
+                    <div class="input-group-btn">
+                        <button class="btn btn-primary" type="submit" id="search-query-btn">Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
         <!-- AVAILABLE FILES -->
         <div class="jumbotron">
-            <h2>Available files <small>Click to download</small></h2>
-            <div class="list-group" id="listFiles">
+            <h2 class="mt-0">Available files <small>Click to download</small></h2>
+            <div class="list-group mb-0" id="listFiles">
             </div>
         </div>
 
