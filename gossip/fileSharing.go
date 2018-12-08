@@ -19,26 +19,35 @@ const DOWNLOADS_DIR = "_Downloads/"
 const TIMEOUT_DATA_REQUEST = 5 // Wait 5 sec before asking again the DataRequest
 var CHUNKS_DIR = "_Chunks/"
 
-type File struct {
+type FileDownload struct {
     LocalName string
     MetaHash []byte
     NextChunkOffset int
     NextChunkHash string
 }
 
+type AvailableFile struct {
+    LocalName string
+    MetaHash []byte
+    NbChunks int
+}
+
 type FileSharing struct {
     gossiper *Gossiper
     // When downloading a file store it here: metaHash->file
-    downloading map[string]*File
+    downloading map[string]*FileDownload
     // Mapping from hash to channel for notifying a data reply
     waitDataRequestChannels map[string]chan bool
+
+    // Keep track of indexed and downloaded files
+    AvailableFiles map[string]*AvailableFile
 
     mutex sync.Mutex
 }
 
 func NewFileSharing() *FileSharing{
     return &FileSharing{
-        downloading: make(map[string]*File),
+        downloading: make(map[string]*FileDownload),
         waitDataRequestChannels: make(map[string]chan bool),
         mutex: sync.Mutex{},
     }
@@ -115,6 +124,14 @@ func (fs *FileSharing) IndexFile(path string) {
     fmt.Println()
 
     _ = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
+
+    fs.mutex.Lock()
+    fs.AvailableFiles[path] = &AvailableFile{
+        LocalName: path,
+        MetaHash: metaHash,
+        NbChunks: nbChunks,
+    }
+    fs.mutex.Unlock()
 }
 
 func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
@@ -128,7 +145,7 @@ func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
 
 func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
     // Add this file to the downloading map
-    fs.downloading[metahash] = &File{
+    fs.downloading[metahash] = &FileDownload{
         LocalName: filename,
         MetaHash: nil,
         NextChunkOffset: 0,
@@ -262,6 +279,7 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
     metafileByteOffset := 0
     nextChunkHash := make([]byte, 0)
     chunkToWrite := make([]byte, 0)
+    nbChunks := 0
     for {
         nextChunkHash = nextChunkHash[:0]
         nextChunkHash = fs.getChunkHashFromMetafile(metahash, metafileByteOffset)
@@ -281,6 +299,7 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
             return
         }
         metafileByteOffset += 1
+        nbChunks += 1
     }
 
     f.Sync()
@@ -291,6 +310,14 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
 
     fmt.Println("RECONSTRUCTED file " + filename)
     fmt.Println()
+
+    fs.mutex.Lock()
+    fs.AvailableFiles[filename] = &AvailableFile{
+        LocalName: filename,
+        MetaHash: []byte(metahash),
+        NbChunks: nbChunks,
+    }
+    fs.mutex.Unlock()
 }
 
 func (fs *FileSharing) readChunkFile(hash string) []byte {

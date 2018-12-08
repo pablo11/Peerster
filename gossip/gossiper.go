@@ -18,6 +18,7 @@ const (
     PACKET_BUFFER_LEN int = 1024
     ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
     ANTI_ENTROPY_PERIOD time.Duration = 2
+    SEARCH_REQUEST_DUPLICATE_PERIOD time.Duration = 500 // Milliseconds to wait before considering new SearchRequest as not duplicate
 )
 
 type Gossiper struct {
@@ -34,12 +35,6 @@ type Gossiper struct {
 
     // Mutex to lock structures on modification
     mutex sync.Mutex
-    /*
-    peersMutex sync.Mutex
-    nextMessageIdMutex sync.Mutex
-    statusMutex sync.Mutex
-    messagesMutex sync.Mutex
-    */
 
     // Channel for wait for acknowledgement event
     waitStatusChannel map[string]chan bool
@@ -53,6 +48,9 @@ type Gossiper struct {
     rtimer time.Duration
 
     fileSharing *FileSharing
+
+    // Array containing SearchRequest uid received in the last 0.5 seconds
+    ProcessingSearchRequests map[string]bool
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -73,17 +71,13 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         messages: make(map[string][]*model.RumorMessage),
 
         mutex: sync.Mutex{},
-        /*
-        peersMutex: sync.Mutex{},
-        nextMessageIdMutex: sync.Mutex{},
-        statusMutex: sync.Mutex{},
-        messagesMutex: sync.Mutex{},
-        */
+
         waitStatusChannel: make(map[string]chan bool),
         //allMessages: make([]*model.RumorMessage),
         routingTable: make(map[string]string),
         rtimer: time.Duration(rtimer),
         fileSharing: NewFileSharing(),
+        ProcessingSearchRequests: make(map[string]bool),
     }
 }
 
@@ -161,11 +155,17 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
         case gp.Private != nil:
             g.HandlePktPrivate(gp, fromAddrStr)
 
+        case gp.DataRequest != nil:
+            g.fileSharing.HandleDataRequest(gp.DataRequest)
+
         case gp.DataReply != nil:
             g.fileSharing.HandleDataReply(gp.DataReply)
 
-        case gp.DataRequest != nil:
-            g.fileSharing.HandleDataRequest(gp.DataRequest)
+        case gp.SearchRequest != nil:
+            g.HandlePktSearchRequest(gp)
+
+        case gp.SearchReply != nil:
+            g.HandlePktSearchReply(gp)
 
         default:
             fmt.Println("WARNING: Unoknown message type")
