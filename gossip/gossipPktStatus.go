@@ -34,7 +34,7 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
                 // Don't flip the coin and stop timer
                 g.getChannelForPeer(fromAddr) <- false
                 return
-            } else if otherStatusPeer.NextID < statusPeer.NextID {
+            } else if otherStatusPeer.NextID < statusPeer.NextID && otherStatusPeer.NextID > 0 {
                 // The gossiper has something more, so send rumor of this thing
                 rm := g.messages[otherStatusPeer.Identifier][otherStatusPeer.NextID - 1]
                 g.sendRumorMessage(rm, false, fromAddr)

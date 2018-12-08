@@ -169,6 +169,29 @@ func (a *ApiHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(200)
 }
 
+func (a *ApiHandler) RequestFile(w http.ResponseWriter, r *http.Request) {
+    // Parse POST "hash"
+    r.ParseForm()
+    filename, isFilenamePresent := r.PostForm["filename"]
+    dest, isDestPresent := r.PostForm["dest"]
+    hash, isHashPresent := r.PostForm["hash"]
+    if !isFilenamePresent || len(filename) != 1 || !isDestPresent || len(dest) != 1 || !isHashPresent || len(hash) != 1 || dest[0] == "0" {
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+
+    filenameStr := filename[0]
+    destStr := dest[0]
+    hashStr := hash[0]
+
+    go a.gossiper.RequestFile(filenameStr, destStr, hashStr)
+
+    // Respond to request with ok
+    w.Header().Set("Server", "Cryptop GO server")
+    w.WriteHeader(200)
+}
+
 func (a *ApiHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
     filesShared, err := ioutil.ReadDir(SHARED_FILES_DIR)
     if err != nil {

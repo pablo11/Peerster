@@ -475,6 +475,9 @@ func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
     }
 }
 
+func (g *Gossiper) RequestFile(filename, dest, metahash string) {
+    g.fileSharing.RequestFile(filename, dest, metahash)
+}
 
 /* HELPERS */
 

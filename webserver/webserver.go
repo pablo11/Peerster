@@ -41,6 +41,9 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
     // Upload a file
     r.HandleFunc("/api/uploadFile", a.UploadFile).Methods("POST")
 
+    // Request a file
+    r.HandleFunc("/api/requestFile", a.RequestFile).Methods("POST")
+
     // List available files
     r.HandleFunc("/api/listFiles", a.ListFiles).Methods("GET")
 
