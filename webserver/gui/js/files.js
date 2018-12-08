@@ -5,6 +5,11 @@ $(document).ready(function() {
 
 function listFiles() {
     $.get("api/listFiles", function(data, status) {
+        // Order by name
+        data.sort(function(a, b) {
+            return a.name > b.name
+        })
+
         console.log(data);
         displayListedFiles(data)
     })
