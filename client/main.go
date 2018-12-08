@@ -4,6 +4,7 @@ import (
     "fmt"
     "flag"
     "net"
+    "strings"
     "github.com/dedis/protobuf"
     "github.com/pablo11/Peerster/model"
 )
@@ -15,9 +16,10 @@ func main() {
     file := flag.String("file", "", "File to be indexed by the gossiper")
     msg := flag.String("msg", "", "Message to be sent")
     request := flag.String("request", "", "Request a chunk or metafile of this hash")
+    keywords := flag.String("keywords", "", "Keywords for the file search")
+    budget := flag.Int("budget", 2, "Budget for the file search")
 
     flag.Parse()
-
 
     // Ask to index file
     if *file != "" && *request == "" {
@@ -49,6 +51,17 @@ func main() {
             Type: "msg",
             Text: *msg,
             Dest: *dest,
+        }
+        sendPacket(cm, *uiPort)
+        return
+    }
+
+    // Send search request
+    if *keywords != "" {
+        cm := &model.ClientMessage{
+            Type: "searchFile",
+            Keywords: strings.Split(*keywords, ","),
+            Budget: *budget,
         }
         sendPacket(cm, *uiPort)
         return

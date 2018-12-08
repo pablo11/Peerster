@@ -201,28 +201,7 @@ func (g *Gossiper) listenClient(uiPort string) {
             err = nil
         }
 
-        switch cm.Type {
-            case "msg":
-                fmt.Println(cm.String())
-                fmt.Println()
-
-                if cm.Dest == "" {
-                    go g.SendPublicMessage(cm.Text, true)
-                } else {
-                    pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
-                    go g.SendPrivateMessage(pm)
-                }
-
-            case "indexFile":
-                fmt.Println("♻️ INDEXING FILE " + cm.File)
-                fmt.Println()
-                go g.fileSharing.IndexFile(cm.File)
-
-            case "downloadFile":
-                fmt.Println("✅ START DOWNLOADING FILE " + cm.File + " - " + time.Now().String())
-                fmt.Println()
-                go g.fileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
-        }
+        g.HandlePktClient(&cm)
     }
 }
 

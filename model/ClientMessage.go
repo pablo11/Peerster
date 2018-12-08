@@ -6,6 +6,8 @@ type ClientMessage struct {
     Dest string
     File string
     Request string
+    Keywords []string
+    Budget uint64
 }
 
 func (cm *ClientMessage) String() string {
