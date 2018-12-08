@@ -29,7 +29,7 @@ type FileDownload struct {
 type AvailableFile struct {
     LocalName string
     MetaHash []byte
-    NbChunks int
+    NbChunks uint64
 }
 
 type FileSharing struct {
@@ -89,7 +89,7 @@ func (fs *FileSharing) IndexFile(path string) {
     }
 
     var metafile []byte
-    nbChunks := 0
+    var nbChunks uint64 = 0
     // Read chunks and build up metafile
     buffer := make([]byte, MAX_CHUNK_SIZE)
     bytesread := 0
@@ -279,7 +279,7 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
     metafileByteOffset := 0
     nextChunkHash := make([]byte, 0)
     chunkToWrite := make([]byte, 0)
-    nbChunks := 0
+    var nbChunks uint64 = 0
     for {
         nextChunkHash = nextChunkHash[:0]
         nextChunkHash = fs.getChunkHashFromMetafile(metahash, metafileByteOffset)
@@ -436,7 +436,6 @@ func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
     }
 
     gp := model.GossipPacket{DataReply: dr}
-    fmt.Println(dr.Origin + " " + dr.Destination + " " + destPeer)
     go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
 }
 

@@ -185,7 +185,7 @@ func (a *ApiHandler) RequestFile(w http.ResponseWriter, r *http.Request) {
     destStr := dest[0]
     hashStr := hash[0]
 
-    go a.gossiper.RequestFile(filenameStr, destStr, hashStr)
+    go a.gossiper.FileSharing.RequestFile(filenameStr, destStr, hashStr)
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")

@@ -7,13 +7,31 @@ import (
 )
 
 func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
+    sr := gp.SearchRequest
     // Discard SearchRequest if it's a duplicate
-    if g.checkDuplicateSearchRequests(gp.SearchRequest) {
+    if g.checkDuplicateSearchRequests(sr) {
         return
     }
 
-    // Process request locally (if I have chunks of the file in question)
+    // Process request locally (if I have files matching the SearchRequest)
+    searchResults := make([]*model.SearchResult, 0)
+    for filename, file := range g.FileSharing.AvailableFiles {
+        for i := 0; i < len(sr.Keywords); i++ {
+            if strings.Contains(filename, sr.Keywords[i]) {
+                searchResults = append(searchResults, &model.SearchResult{
+                    FileName: filename,
+                    MetafileHash: file.MetaHash,
+                    ChunkMap: make([]uint64, 0),
+                    ChunkCount: file.NbChunks,
+                })
+            }
+        }
+    }
 
+    // Send a SearchReply if at least one file matches the SearchRequest
+    if len(searchResults) > 0 {
+        go g.sendSearchReply(sr.Origin, searchResults)
+    }
 
     // Subtract 1 from the request's budget
 
@@ -47,6 +65,23 @@ func (g *Gossiper) checkDuplicateSearchRequests(sr *model.SearchRequest) bool {
         delete(g.ProcessingSearchRequests, searchRequestUid)
     }()
     return false
+}
+
+func (g *Gossiper) sendSearchReply(dest string, results []*model.SearchResult) {
+    destPeer := g.GetNextHopForDest(dest)
+    if destPeer == "" {
+        return
+    }
+
+    sr := model.SearchReply{
+        Origin: g.Name,
+        Destination: dest,
+        HopLimit: 10,
+        Results: results,
+    }
+
+    gp := model.GossipPacket{SearchReply: &sr}
+    go g.sendGossipPacket(&gp, []string{destPeer})
 }
 
 func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {

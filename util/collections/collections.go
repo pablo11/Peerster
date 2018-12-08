@@ -19,7 +19,7 @@ func Map(vs []string, f func(string) string) []string {
 }
 
 func MapKeys(vs map[string]string) []string {
-    var keys []string
+    keys := make([]string, 0, len(vs))
     for key, _ := range vs {
         keys = append(keys, key)
     }

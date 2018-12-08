@@ -47,7 +47,7 @@ type Gossiper struct {
 
     rtimer time.Duration
 
-    fileSharing *FileSharing
+    FileSharing *FileSharing
 
     // Array containing SearchRequest uid received in the last 0.5 seconds
     ProcessingSearchRequests map[string]bool
@@ -76,7 +76,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         //allMessages: make([]*model.RumorMessage),
         routingTable: make(map[string]string),
         rtimer: time.Duration(rtimer),
-        fileSharing: NewFileSharing(),
+        FileSharing: NewFileSharing(),
         ProcessingSearchRequests: make(map[string]bool),
     }
 }
@@ -85,7 +85,7 @@ func (g *Gossiper) Run(uiPort string) {
     fmt.Println("\033[0;32mGossiper " + g.Name + " started on " + g.address.String() + "\033[0m")
     fmt.Println()
 
-    g.fileSharing.SetGossiper(g)
+    g.FileSharing.SetGossiper(g)
 
     go g.listenPeers()
     go g.listenClient(uiPort)
@@ -156,10 +156,10 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
             g.HandlePktPrivate(gp, fromAddrStr)
 
         case gp.DataRequest != nil:
-            g.fileSharing.HandleDataRequest(gp.DataRequest)
+            g.FileSharing.HandleDataRequest(gp.DataRequest)
 
         case gp.DataReply != nil:
-            g.fileSharing.HandleDataReply(gp.DataReply)
+            g.FileSharing.HandleDataReply(gp.DataReply)
 
         case gp.SearchRequest != nil:
             g.HandlePktSearchRequest(gp)
@@ -473,10 +473,6 @@ func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
         fmt.Println("DSDV " + rm.Origin + " " + fromAddr)
         fmt.Println()
     }
-}
-
-func (g *Gossiper) RequestFile(filename, dest, metahash string) {
-    g.fileSharing.RequestFile(filename, dest, metahash)
 }
 
 /* HELPERS */

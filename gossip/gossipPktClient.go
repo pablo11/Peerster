@@ -19,10 +19,10 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
             }
 
         case "indexFile":
-            go g.fileSharing.IndexFile(cm.File)
+            go g.FileSharing.IndexFile(cm.File)
 
         case "downloadFile":
-            go g.RequestFile(cm.File, cm.Dest, cm.Request)
+            go g.FileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
 
         case "searchFile":
 
