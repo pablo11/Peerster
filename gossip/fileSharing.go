@@ -24,30 +24,22 @@ type FileDownload struct {
     MetaHash []byte
     NextChunkOffset int
     NextChunkHash string
-}
-
-type AvailableFile struct {
-    LocalName string
-    MetaHash []byte
-    NbChunks uint64
+    NbChunks int
 }
 
 type FileSharing struct {
     gossiper *Gossiper
     // When downloading a file store it here: metaHash->file
-    downloading map[string]*FileDownload
+    AvailableFiles map[string]*FileDownload
     // Mapping from hash to channel for notifying a data reply
     waitDataRequestChannels map[string]chan bool
-
-    // Keep track of indexed and downloaded files
-    AvailableFiles map[string]*AvailableFile
 
     mutex sync.Mutex
 }
 
 func NewFileSharing() *FileSharing{
     return &FileSharing{
-        downloading: make(map[string]*FileDownload),
+        AvailableFiles: make(map[string]*FileDownload),
         waitDataRequestChannels: make(map[string]chan bool),
         mutex: sync.Mutex{},
     }
@@ -124,14 +116,6 @@ func (fs *FileSharing) IndexFile(path string) {
     fmt.Println()
 
     _ = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
-
-    fs.mutex.Lock()
-    fs.AvailableFiles[path] = &AvailableFile{
-        LocalName: path,
-        MetaHash: metaHash,
-        NbChunks: nbChunks,
-    }
-    fs.mutex.Unlock()
 }
 
 func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
@@ -144,12 +128,13 @@ func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
 }
 
 func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
-    // Add this file to the downloading map
-    fs.downloading[metahash] = &FileDownload{
+    // Add this file to the AvailableFiles map
+    fs.AvailableFiles[metahash] = &FileDownload{
         LocalName: filename,
         MetaHash: nil,
         NextChunkOffset: 0,
         NextChunkHash: "",
+        NbChunks: 0,
     }
 
     byteHash, err := hex.DecodeString(metahash)
@@ -189,9 +174,11 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
     // Notify packet received
     fs.notifyChannelForHash(hex.EncodeToString(dr.HashValue))
 
-    file, isDownloading := fs.downloading[hex.EncodeToString(dr.HashValue)]
-    if isDownloading && file.MetaHash == nil {
-        fmt.Println("DOWNLOADING metafile of " + file.LocalName + " from " + dr.Origin)
+    file, isAvailableFiles := fs.AvailableFiles[hex.EncodeToString(dr.HashValue)]
+    if isAvailableFiles && file.MetaHash == nil {
+        fmt.Println("AvailableFiles metafile of " + file.LocalName + " from " + dr.Origin)
+
+        nbChunks := len(dr.Data) / 32
 
         // Store the metafile
         err := fs.writeBytesToFile(hex.EncodeToString(dr.HashValue), dr.Data)
@@ -207,9 +194,10 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
         }
 
         fs.requestData(dr.Origin, firstChunkHash)
-        fs.downloading[hex.EncodeToString(dr.HashValue)].NextChunkOffset = 0
-        fs.downloading[hex.EncodeToString(dr.HashValue)].MetaHash = dr.HashValue
-        fs.downloading[hex.EncodeToString(dr.HashValue)].NextChunkHash = hex.EncodeToString(firstChunkHash)
+        fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NextChunkOffset = 0
+        fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].MetaHash = dr.HashValue
+        fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NextChunkHash = hex.EncodeToString(firstChunkHash)
+        fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NbChunks = nbChunks
     } else {
         // Store the chunk
         err := fs.writeBytesToFile(hex.EncodeToString(dr.HashValue), dr.Data)
@@ -218,10 +206,10 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
         }
 
         // Find metafile requesting this chunk
-        for metahash, file := range fs.downloading {
+        for metahash, file := range fs.AvailableFiles {
             if file.NextChunkHash == hex.EncodeToString(dr.HashValue) {
-                fs.downloading[metahash].NextChunkOffset += 1
-                fmt.Println("DOWNLOADING " + file.LocalName + " chunk", fs.downloading[metahash].NextChunkOffset, "from " + dr.Origin)
+                fs.AvailableFiles[metahash].NextChunkOffset += 1
+                fmt.Println("AvailableFiles " + file.LocalName + " chunk", fs.AvailableFiles[metahash].NextChunkOffset, "from " + dr.Origin)
                 nextChunkHash := fs.getChunkHashFromMetafile(metahash, file.NextChunkOffset)
                 if nextChunkHash == nil {
                     // The download is complete. Reconstruct the file and save it with the local name
@@ -229,7 +217,7 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
                 } else {
                     // Request next chunk
                     fs.requestData(dr.Origin, nextChunkHash)
-                    fs.downloading[metahash].NextChunkHash = hex.EncodeToString(nextChunkHash)
+                    fs.AvailableFiles[metahash].NextChunkHash = hex.EncodeToString(nextChunkHash)
                 }
 
                 return
@@ -304,20 +292,8 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
 
     f.Sync()
 
-    // Remove it from downloading
-    fs.downloading[metahash] = nil
-    delete(fs.downloading, metahash)
-
     fmt.Println("RECONSTRUCTED file " + filename)
     fmt.Println()
-
-    fs.mutex.Lock()
-    fs.AvailableFiles[filename] = &AvailableFile{
-        LocalName: filename,
-        MetaHash: []byte(metahash),
-        NbChunks: nbChunks,
-    }
-    fs.mutex.Unlock()
 }
 
 func (fs *FileSharing) readChunkFile(hash string) []byte {

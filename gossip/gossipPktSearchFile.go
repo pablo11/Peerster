@@ -24,14 +24,20 @@ func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
 
     // Process request locally (if I have files matching the SearchRequest)
     searchResults := make([]*model.SearchResult, 0)
-    for filename, file := range g.FileSharing.AvailableFiles {
+    for _, file := range g.FileSharing.AvailableFiles {
+        filename := file.LocalName
         for i := 0; i < len(sr.Keywords); i++ {
             if strings.Contains(filename, sr.Keywords[i]) {
+                chunkMap := make([]uint64, 0)
+                for k := 0; k < file.NextChunkOffset; k++ {
+                    chunkMap = append(chunkMap, uint64(k + 1))
+                }
+
                 searchResults = append(searchResults, &model.SearchResult{
                     FileName: filename,
                     MetafileHash: file.MetaHash,
-                    ChunkMap: make([]uint64, 0),
-                    ChunkCount: file.NbChunks,
+                    ChunkMap: chunkMap,
+                    ChunkCount: uint64(file.NbChunks),
                 })
             }
         }
@@ -168,14 +174,6 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
     return randomPeers
 }
 
-/*
-type ActiveSearch struct {
-    Keywords []string
-    LastBudget uint64
-    NotifyChannel: chan
-}
-*/
-
 func (g *Gossiper) startSearchRequest(budget uint64, keywords []string) {
     activeSearchUid := strings.Join(keywords, ",")
 
@@ -240,6 +238,12 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
 
 
     // Handle Reply: check if it's for an active search request
+
+
+    // Itera sui result
+    //  Se ce l'ho già te ne fotti
+    //  Altrimenti scarichi tutto il file, trovare metodo per se il result non contiene tutti i chunks
+
 
 
 

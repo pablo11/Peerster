@@ -25,6 +25,10 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
             go g.FileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
 
         case "searchFile":
+
+            // TODO: if budget is specified -> do not increment budget every second
+
+
             go g.startSearchRequest(cm.Budget, cm.Keywords)
 
         default:
