@@ -40,9 +40,9 @@ func (g *Gossiper) compareVectorClocks(sp *model.StatusPacket, fromAddr string) 
                 return
             } else if otherStatusPeer.NextID < statusPeer.NextID && otherStatusPeer.NextID > 0 {
                 // The gossiper has something more, so send rumor of this thing
-                g.messagesMutex.Lock()
+                //g.messagesMutex.Lock()
                 rm := g.messages[otherStatusPeer.Identifier][otherStatusPeer.NextID - 1]
-                g.messagesMutex.Unlock()
+                //g.messagesMutex.Unlock()
                 g.sendRumorMessage(rm, false, fromAddr)
 
                 // Don't flip the coin and stop timer

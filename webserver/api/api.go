@@ -9,7 +9,6 @@ import (
     "strings"
     "strconv"
     "encoding/base64"
-    "encoding/hex"
     "github.com/pablo11/Peerster/gossip"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/validator"
@@ -287,7 +286,7 @@ func (a *ApiHandler) SearchResults(w http.ResponseWriter, r *http.Request) {
     fileMatches := a.gossiper.GetFullMatches()
     jsonFiles := make([]string, len(fileMatches))
     for i, f := range fileMatches {
-        jsonFiles[i] = "{\"filename\":\"" + f.Filename + "\", \"metahash\":\"" + hex.EncodeToString(f.MetaHash) + "\"}"
+        jsonFiles[i] = "{\"filename\":\"" + f.Filename + "\", \"metahash\":\"" + f.MetaHash + "\"}"
     }
 
     sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))

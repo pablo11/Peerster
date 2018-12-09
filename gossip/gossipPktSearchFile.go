@@ -21,7 +21,7 @@ type ActiveSearch struct {
 
 type FileMatch struct {
     Filename string
-    MetaHash []byte
+    MetaHash string
     NbChunks uint64
     // Map: chunck nb -> node having it
     ChunksLocation []string
@@ -286,61 +286,58 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
             chunkMapStr[i] = strconv.Itoa(int(result.ChunkMap[i]))
         }
 
-        // Find search request corresponding to result
-        searchRequesUid := ""
-        for srUid, _ := range g.activeSearchRequests {
-            keywords := strings.Split(srUid, ",")
-            for _, k := range keywords {
-                if strings.Contains(result.FileName, k) {
-                    searchRequesUid = srUid
-                }
-            }
-        }
-        if searchRequesUid == "" {
-            fmt.Println("WARNING: Dropptin SearchReply not expected")
-            return
-        }
-
         hexMetahash := hex.EncodeToString(result.MetafileHash)
         fmt.Println("FOUND match " + result.FileName + " at " + sr.Origin + " metafile=" + hexMetahash + " chunks=" + strings.Join(chunkMapStr, ","))
 
-        g.activeSearchRequestsMutex.Lock()
+        // Find search request corresponding to result
+        for searchRequesUid, _ := range g.activeSearchRequests {
+            keywords := strings.Split(searchRequesUid, ",")
+            for _, k := range keywords {
+                if strings.Contains(result.FileName, k) {
+                    g.activeSearchRequestsMutex.Lock()
 
-        _, exists := g.activeSearchRequests[searchRequesUid].Matches[hexMetahash]
-        if !exists {
-            g.activeSearchRequests[searchRequesUid].Matches[hexMetahash] = &FileMatch{
-                Filename: result.FileName,
-                MetaHash: result.MetafileHash,
-                NbChunks: result.ChunkCount,
-                ChunksLocation: make([]string, result.ChunkCount),
-            }
-        }
+                    _, exists := g.activeSearchRequests[searchRequesUid].Matches[hexMetahash]
+                    if !exists {
+                        g.activeSearchRequests[searchRequesUid].Matches[hexMetahash] = &FileMatch{
+                            Filename: result.FileName,
+                            MetaHash: hex.EncodeToString(result.MetafileHash),
+                            NbChunks: result.ChunkCount,
+                            ChunksLocation: make([]string, result.ChunkCount),
+                        }
+                    }
 
-        // Store location of each chunk
-        for _, chunkNb := range result.ChunkMap {
-            g.activeSearchRequests[searchRequesUid].Matches[hexMetahash].ChunksLocation[int(chunkNb) - 1] = sr.Origin
-        }
+                    // Store location of each chunk
+                    for _, chunkNb := range result.ChunkMap {
+                        g.activeSearchRequests[searchRequesUid].Matches[hexMetahash].ChunksLocation[int(chunkNb) - 1] = sr.Origin
+                    }
 
-        g.activeSearchRequestsMutex.Unlock()
+                    g.activeSearchRequestsMutex.Unlock()
 
-        // Check if it's a full match
-        if len(g.activeSearchRequests[searchRequesUid].Matches[hexMetahash].ChunksLocation) == int(g.activeSearchRequests[searchRequesUid].Matches[hexMetahash].NbChunks) {
-            isDuplicate := false
-            g.FullMatchesMutex.Lock()
-            for _, fullMatch := range g.FullMatches {
-                if hex.EncodeToString(fullMatch.MetaHash) == hexMetahash {
-                    isDuplicate = true
+                    // Check if it's a full match
+                    if len(g.activeSearchRequests[searchRequesUid].Matches[hexMetahash].ChunksLocation) == int(g.activeSearchRequests[searchRequesUid].Matches[hexMetahash].NbChunks) {
+                        g.storeFullMatch(hexMetahash, searchRequesUid)
+                    }
                 }
             }
-
-            if !isDuplicate {
-                g.FullMatches = append(g.FullMatches, g.activeSearchRequests[searchRequesUid].Matches[hexMetahash])
-                if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
-                    fmt.Println("SEARCH FINISHED")
-                    g.activeSearchRequests[searchRequesUid].NotifyChannel <- true
-                }
-            }
-            g.FullMatchesMutex.Unlock()
         }
     }
+}
+
+func (g *Gossiper) storeFullMatch(hexMetahash, searchRequesUid string) {
+    g.FullMatchesMutex.Lock()
+    isDuplicate := false
+    for _, fullMatch := range g.FullMatches {
+        if fullMatch.MetaHash == hexMetahash {
+            isDuplicate = true
+        }
+    }
+
+    if !isDuplicate {
+        g.FullMatches = append(g.FullMatches, g.activeSearchRequests[searchRequesUid].Matches[hexMetahash])
+        if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
+            fmt.Println("SEARCH FINISHED")
+            g.activeSearchRequests[searchRequesUid].NotifyChannel <- true
+        }
+    }
+    g.FullMatchesMutex.Unlock()
 }

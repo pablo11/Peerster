@@ -156,7 +156,7 @@ func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
     if dest == "" {
         // Download from multiple sources
         for _, fullMatch := range fs.gossiper.FullMatches {
-            if hex.EncodeToString(fullMatch.MetaHash) == metahash {
+            if fullMatch.MetaHash == metahash {
                 chunksLocation = fullMatch.ChunksLocation
                 dest = fullMatch.ChunksLocation[0]
                 filename = fullMatch.Filename
