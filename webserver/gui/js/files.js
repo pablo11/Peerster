@@ -2,6 +2,7 @@ $(document).ready(function() {
     listFiles()
     setupFileUpload()
     setupRequestFile()
+    setupSearchFile()
 })
 
 function listFiles() {
@@ -11,19 +12,15 @@ function listFiles() {
             return a.name > b.name
         })
 
-        console.log(data);
-        displayListedFiles(data)
+        //console.log(data);
+        var html = ""
+        for (var f of files) {
+            const b64pth = btoa(f.path)
+            html += '<a href="/api/downloadFile?path=' + b64pth + '" target="_blank" class="list-group-item">' + f.name + '</a>'
+        }
+
+        $("#listFiles").html(html)
     })
-}
-
-function displayListedFiles(files) {
-    var html = ""
-    for (var f of files) {
-        const b64pth = btoa(f.path)
-        html += '<a href="/api/downloadFile?path=' + b64pth + '" target="_blank" class="list-group-item">' + f.name + '</a>'
-    }
-
-    $("#listFiles").html(html)
 }
 
 function setupFileUpload() {
@@ -90,17 +87,53 @@ function setupRequestFile() {
 
 
         $("#request-file-btn").click(function() {
-            // Send message to API
+            // Send request to API
             $.post("api/requestFile", {
                 filename: $("#filename").val(),
                 dest: $("#requestFromNode").val() || "0",
                 hash: $("#fileHash").val()
             }, function(data, status) {
-                console.log("File requested");
+                //console.log("File requested");
                 window.alert("The file was requested, reload the page in a couple of seconds and find it in the available files")
             })
 
             return false;
         })
+    })
+}
+
+function setupSearchFile() {
+    $("#search-query-btn").click(function() {
+        const searchQuery = $("#searchQuery").val()
+
+        $.post("api/searchFiles", {
+            query: searchQuery
+        }, function(data, status) {
+            window.alert("The search process started, results will appear below.")
+        })
+
+        return false
+    })
+
+    $(".search-results").hide()
+    setInterval(function() {
+        getAndDisplaySearchResults()
+    }, 2000)
+}
+
+function getAndDisplaySearchResults() {
+    $.get("api/searchResults", function(data, status) {
+        if (data.length < 1) {
+            $(".search-results").hide()
+        } else {
+            $(".search-results").show()
+        }
+
+        var html = ""
+        for (var res of data) {
+            html += '<a href="#" data-metahash="' + res.metahash + '" class="list-group-item">' + res.filename + '</a>'
+        }
+
+        $("#listSearchResults").html(html)
     })
 }

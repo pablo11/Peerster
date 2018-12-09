@@ -122,6 +122,10 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
     return g.allMessages
 }
 
+func (g *Gossiper) GetFullMatches() []*FileMatch {
+    return g.FullMatches
+}
+
 func (g *Gossiper) listenPeers() {
     packetBuffer := make([]byte, 9 * PACKET_BUFFER_LEN)
     bytesRead := 0

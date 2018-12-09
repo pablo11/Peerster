@@ -50,6 +50,12 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
     // Download file
     r.HandleFunc("/api/downloadFile", a.DownloadFile).Methods("GET")
 
+    // Search file
+    r.HandleFunc("/api/searchFiles", a.SearchFiles).Methods("POST")
+
+    // Search file results
+    r.HandleFunc("/api/searchResults", a.SearchResults).Methods("GET")
+
     // Get the html index page
     r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("./webserver/gui/"))))
 

@@ -8,6 +8,7 @@ import (
     "net/http"
     "strings"
     "encoding/base64"
+    "encoding/hex"
     "github.com/pablo11/Peerster/gossip"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/validator"
@@ -215,9 +216,7 @@ func (a *ApiHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-    json := strings.Join(filesJson, ",")
-
-    sendJSON(w, []byte(`[` + json + `]`))
+    sendJSON(w, []byte(`[` + strings.Join(filesJson, ",") + `]`))
 }
 
 func (a *ApiHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
@@ -239,4 +238,34 @@ func (a *ApiHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Server", "Cryptop GO server")
     w.Header().Add("Content-Disposition", "Attachment")
     http.ServeFile(w, r, string(decodedPath))
+}
+
+func (a *ApiHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
+    // Get search query from request
+    r.ParseForm()
+    query, ok := r.PostForm["query"]
+    if !ok || len(query) < 1 || query[0] == "" {
+        fmt.Println(query[0])
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+
+    keywords := strings.Split(query[0], ",")
+
+    go a.gossiper.StartSearchRequest(2, keywords, true)
+
+    // Respond to request with ok
+    w.Header().Set("Server", "Cryptop GO server")
+    w.WriteHeader(200)
+}
+
+func (a *ApiHandler) SearchResults(w http.ResponseWriter, r *http.Request) {
+    fileMatches := a.gossiper.GetFullMatches()
+    jsonFiles := make([]string, len(fileMatches))
+    for i, f := range fileMatches {
+        jsonFiles[i] = "{\"filename\":\"" + f.Filename + "\", \"metahash\":\"" + hex.EncodeToString(f.MetaHash) + "\"}"
+    }
+
+    sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
 }

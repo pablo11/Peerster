@@ -26,9 +26,9 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
 
         case "searchFile":
             if cm.Budget == 0 {
-                go g.startSearchRequest(2, cm.Keywords, true)
+                go g.StartSearchRequest(2, cm.Keywords, true)
             } else {
-                go g.startSearchRequest(cm.Budget, cm.Keywords, false)
+                go g.StartSearchRequest(cm.Budget, cm.Keywords, false)
             }
 
         default:

@@ -34,11 +34,28 @@ func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
     }
 
     // Process request locally (if I have files matching the SearchRequest)
+    g.searchFileLocally(sr.Keywords, sr.Origin)
+
+    // Subtract 1 from the request's budget
+    sr.Budget -= 1
+
+    // If request's budget is greater than zero redistribute requests to neighbors
+    if sr.Budget <= 0 {
+        return
+    }
+
+    // Propagate the SearchRequest subdividing the budget
+    g.budgetPropagation(sr.Budget, sr.Origin, sr.Keywords)
+}
+
+func (g *Gossiper) searchFileLocally(keywords []string, origin string) {
+    fmt.Println("Searching files locally")
+
     searchResults := make([]*model.SearchResult, 0)
     for _, file := range g.FileSharing.AvailableFiles {
         filename := file.LocalName
-        for i := 0; i < len(sr.Keywords); i++ {
-            if strings.Contains(filename, sr.Keywords[i]) {
+        for i := 0; i < len(keywords); i++ {
+            if strings.Contains(filename, keywords[i]) {
                 // Following my implementation, if I have chunk nb n, I also have all chunks nb smaller than n
                 chunkMap := make([]uint64, 0)
                 for k := 0; k < file.NextChunkOffset; k++ {
@@ -57,19 +74,8 @@ func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
 
     // Send a SearchReply if at least one file matches the SearchRequest
     if len(searchResults) > 0 {
-        go g.sendSearchReplyFor(sr.Origin, searchResults)
+        go g.sendSearchReplyFor(origin, searchResults)
     }
-
-    // Subtract 1 from the request's budget
-    sr.Budget -= 1
-
-    // If request's budget is greater than zero redistribute requests to neighbors
-    if sr.Budget <= 0 {
-        return
-    }
-
-    // Propagate the SearchRequest subdividing the budget
-    g.budgetPropagation(sr.Budget, sr.Origin, sr.Keywords)
 }
 
 func (g *Gossiper) budgetPropagation(budget uint64, origin string, keywords []string) {
@@ -186,8 +192,10 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
     return randomPeers
 }
 
-func (g *Gossiper) startSearchRequest(budget uint64, keywords []string, startExpandingRing bool) {
-    if g.ActiveSearchRequest != nil /*&& g.ActiveSearchRequest.LastBudget >= budget*/ {
+func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExpandingRing bool) {
+    fmt.Println("💡 SEARCH STARTED for keywords=" + strings.Join(keywords, ","))
+
+    if g.ActiveSearchRequest != nil && g.ActiveSearchRequest.LastBudget >= budget {
         fmt.Println("WARNING: A SearchRequest is already beeing searched")
         return
     }
@@ -199,16 +207,16 @@ func (g *Gossiper) startSearchRequest(budget uint64, keywords []string, startExp
         Matches: make(map[string]*FileMatch),
     }
 
+    go g.searchFileLocally(keywords, g.Name)
+
     // Propagate the SearchRequest subdividing the budget
     go g.budgetPropagation(budget, g.Name, keywords)
 
-    if startExpandingRing {
-        // Keep record of SearchRequests sent until 2 mathces are got, in the meantime
-        // every 1 second double the budget and sent a new request (up to a threshold of 32)
+    // Keep record of SearchRequests sent until 2 mathces are got, in the meantime
+    // every 1 second double the budget and sent a new request (up to a threshold of 32)
 
-        ticker := time.NewTicker(SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD * time.Second)
-        defer ticker.Stop()
-    }
+    ticker := time.NewTicker(SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD * time.Second)
+    defer ticker.Stop()
 
     select {
     case <-g.ActiveSearchRequest.NotifyChannel:
@@ -230,12 +238,16 @@ func (g *Gossiper) startSearchRequest(budget uint64, keywords []string, startExp
         // Send a new SearchRequest doubling budget if smaller than MAX_SEARCH_BUDGET
         ticker.Stop()
 
+        if !startExpandingRing {
+            return
+        }
+
         if budget >= MAX_SEARCH_BUDGET {
             fmt.Println("⛔️ MAX BUDGET REACHED")
             return
         }
 
-        go g.startSearchRequest(budget * 2, keywords)
+        go g.StartSearchRequest(budget * 2, keywords, startExpandingRing)
     }
 }
 
