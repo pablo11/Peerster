@@ -11,22 +11,6 @@ import (
     "github.com/pablo11/Peerster/util/collections"
 )
 
-type ActiveSearch struct {
-    Keywords []string
-    LastBudget uint64
-    NotifyChannel chan bool
-    // Metahash -> FileMatch
-    Matches map[string]*FileMatch
-}
-
-type FileMatch struct {
-    Filename string
-    MetaHash string
-    NbChunks uint64
-    // Map: chunck nb -> node having it
-    ChunksLocation []string
-}
-
 func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
     sr := gp.SearchRequest
     // Discard SearchRequest if it's a duplicate
@@ -215,11 +199,11 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
         return
     }
 
-    g.activeSearchRequests[searchRequestUid] = &ActiveSearch{
+    g.activeSearchRequests[searchRequestUid] = &model.ActiveSearch{
         Keywords: keywords,
         LastBudget: budget,
         NotifyChannel: make(chan bool),
-        Matches: make(map[string]*FileMatch),
+        Matches: make(map[string]*model.FileMatch),
     }
 
     g.activeSearchRequestsMutex.Unlock()
@@ -298,7 +282,7 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
 
                     _, exists := g.activeSearchRequests[searchRequesUid].Matches[hexMetahash]
                     if !exists {
-                        g.activeSearchRequests[searchRequesUid].Matches[hexMetahash] = &FileMatch{
+                        g.activeSearchRequests[searchRequesUid].Matches[hexMetahash] = &model.FileMatch{
                             Filename: result.FileName,
                             MetaHash: hex.EncodeToString(result.MetafileHash),
                             NbChunks: result.ChunkCount,

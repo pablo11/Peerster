@@ -18,19 +18,10 @@ const DOWNLOADS_DIR = "_Downloads/"
 const TIMEOUT_DATA_REQUEST = 5 // Wait 5 sec before asking again the DataRequest
 var CHUNKS_DIR = "_Chunks/"
 
-type FileDownload struct {
-    LocalName string
-    MetaHash []byte
-    NextChunkOffset int
-    NextChunkHash string
-    NbChunks int
-    ChunksLocation []string
-}
-
 type FileSharing struct {
     gossiper *Gossiper
     // When downloading a file store it here: metaHash->file
-    AvailableFiles map[string]*FileDownload
+    AvailableFiles map[string]*model.FileDownload
     // Mapping from hash to channel for notifying a data reply
     waitDataRequestChannels map[string]chan bool
 
@@ -39,7 +30,7 @@ type FileSharing struct {
 
 func NewFileSharing() *FileSharing{
     return &FileSharing{
-        AvailableFiles: make(map[string]*FileDownload),
+        AvailableFiles: make(map[string]*model.FileDownload),
         waitDataRequestChannels: make(map[string]chan bool),
         waitDataRequestChannelsMutex: sync.Mutex{},
     }
@@ -122,7 +113,7 @@ func (fs *FileSharing) IndexFile(path string) {
         chunksLocation[i] = fs.gossiper.Name
     }
 
-    fs.AvailableFiles[hex.EncodeToString(metaHash)] = &FileDownload{
+    fs.AvailableFiles[hex.EncodeToString(metaHash)] = &model.FileDownload{
         LocalName: path,
         MetaHash: metaHash,
         NextChunkOffset: int(nbChunks),
@@ -166,7 +157,7 @@ func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
     }
 
     // Add this file to the AvailableFiles map
-    fs.AvailableFiles[metahash] = &FileDownload{
+    fs.AvailableFiles[metahash] = &model.FileDownload{
         LocalName: filename,
         MetaHash: nil,
         NextChunkOffset: 0,

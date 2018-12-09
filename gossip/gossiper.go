@@ -58,10 +58,10 @@ type Gossiper struct {
     processingSearchRequestsMutex sync.Mutex
 
     // Keep track of current SearchRequests: mapping from keywords to ActiveSearch
-    activeSearchRequests map[string]*ActiveSearch
+    activeSearchRequests map[string]*model.ActiveSearch
     activeSearchRequestsMutex sync.Mutex
 
-    FullMatches []*FileMatch
+    FullMatches []*model.FileMatch
     FullMatchesMutex sync.Mutex
 }
 
@@ -93,9 +93,9 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         routingTableMutex: sync.Mutex{},
         processingSearchRequests: make(map[string]bool),
         processingSearchRequestsMutex: sync.Mutex{},
-        activeSearchRequests: make(map[string]*ActiveSearch),
+        activeSearchRequests: make(map[string]*model.ActiveSearch),
         activeSearchRequestsMutex: sync.Mutex{},
-        FullMatches: make([]*FileMatch, 0),
+        FullMatches: make([]*model.FileMatch, 0),
         FullMatchesMutex: sync.Mutex{},
     }
 }
@@ -135,7 +135,7 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
     return g.allMessages
 }
 
-func (g *Gossiper) GetFullMatches() []*FileMatch {
+func (g *Gossiper) GetFullMatches() []*model.FileMatch {
     return g.FullMatches
 }
 
