@@ -30,9 +30,10 @@ type Gossiper struct {
     Name string
     peers []string
     simple bool
-
-    // For rumoring
+    rtimer time.Duration
     nextMessageId uint32
+
+    FileSharing *FileSharing
 
     status map[string]*model.PeerStatus
     statusMutex sync.Mutex
@@ -51,10 +52,6 @@ type Gossiper struct {
     // Routing table Origin->ip:port
     routingTable map[string]string
     routingTableMutex sync.Mutex
-
-    rtimer time.Duration
-
-    FileSharing *FileSharing
 
     // Array containing SearchRequest uid received in the last 0.5 seconds
     processingSearchRequests map[string]bool
@@ -81,7 +78,9 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         Name: name,
         peers: peers,
         simple: simple,
+        rtimer: time.Duration(rtimer),
         nextMessageId: 1,
+        FileSharing: NewFileSharing(),
         status: make(map[string]*model.PeerStatus),
         statusMutex: sync.Mutex{},
         messages: make(map[string][]*model.RumorMessage),
@@ -92,8 +91,6 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         allMessagesMutex: sync.Mutex{},
         routingTable: make(map[string]string),
         routingTableMutex: sync.Mutex{},
-        rtimer: time.Duration(rtimer),
-        FileSharing: NewFileSharing(),
         processingSearchRequests: make(map[string]bool),
         processingSearchRequestsMutex: sync.Mutex{},
         activeSearchRequests: make(map[string]*ActiveSearch),
@@ -521,15 +518,4 @@ func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
         fmt.Println()
     }
     g.routingTableMutex.Unlock()
-}
-
-/* HELPERS */
-
-func resolveAddress(addr string) *net.UDPAddr {
-    udpAddr, err := net.ResolveUDPAddr("udp4", addr)
-    if err != nil {
-        fmt.Println(err)
-        return nil
-    }
-    return udpAddr
 }

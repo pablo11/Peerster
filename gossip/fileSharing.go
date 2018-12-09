@@ -8,7 +8,6 @@ import (
     "io"
     "io/ioutil"
     "sync"
-    "crypto/sha256"
     "encoding/hex"
     "github.com/pablo11/Peerster/model"
 )
@@ -35,14 +34,14 @@ type FileSharing struct {
     // Mapping from hash to channel for notifying a data reply
     waitDataRequestChannels map[string]chan bool
 
-    mutex sync.Mutex
+    waitDataRequestChannelsMutex sync.Mutex
 }
 
 func NewFileSharing() *FileSharing{
     return &FileSharing{
         AvailableFiles: make(map[string]*FileDownload),
         waitDataRequestChannels: make(map[string]chan bool),
-        mutex: sync.Mutex{},
+        waitDataRequestChannelsMutex: sync.Mutex{},
     }
 }
 
@@ -131,15 +130,6 @@ func (fs *FileSharing) IndexFile(path string) {
         NbChunks: int(nbChunks),
         ChunksLocation: chunksLocation,
     }
-}
-
-func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
-    err := ioutil.WriteFile(CHUNKS_DIR + hash, buffer, 0644)
-    if (err != nil) {
-        fmt.Println("ERROR: While writing metafile or chunk (hash=" + hash + ") to file")
-        fmt.Println(err)
-    }
-    return err
 }
 
 // If dest is "", the file is downloaded from multiple sources. Sources are
@@ -338,6 +328,15 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
     fmt.Println()
 }
 
+func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
+    err := ioutil.WriteFile(CHUNKS_DIR + hash, buffer, 0644)
+    if (err != nil) {
+        fmt.Println("ERROR: While writing metafile or chunk (hash=" + hash + ") to file")
+        fmt.Println(err)
+    }
+    return err
+}
+
 func (fs *FileSharing) readChunkFile(hash string) []byte {
     data, err := ioutil.ReadFile(CHUNKS_DIR + hash)
     if (err != nil) {
@@ -381,29 +380,9 @@ func (fs *FileSharing) requestData(dest string, hashValue []byte) {
     fs.sendDataRequest(&dr)
 }
 
-func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
-    if dr.Destination == fs.gossiper.Name {
-        fs.HandleDataRequest(dr)
-        return
-    }
-
-    // Get hop-peer if existing
-    destPeer := fs.gossiper.GetNextHopForDest(dr.Destination)
-    if destPeer == "" {
-        return
-    }
-
-    gp := model.GossipPacket{DataRequest: dr}
-    go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
-
-    if dr.Origin == fs.gossiper.Name {
-        go fs.waitDataReply(dr)
-    }
-}
-
 func (fs *FileSharing) getChannelForHash(datahash string) chan bool {
-    fs.mutex.Lock()
-    defer fs.mutex.Unlock()
+    fs.waitDataRequestChannelsMutex.Lock()
+    defer fs.waitDataRequestChannelsMutex.Unlock()
     _, channelExists := fs.waitDataRequestChannels[datahash]
     if !channelExists {
         fs.waitDataRequestChannels[datahash] = make(chan bool)
@@ -412,8 +391,8 @@ func (fs *FileSharing) getChannelForHash(datahash string) chan bool {
 }
 
 func (fs *FileSharing) removeChannelForHash(datahash string) {
-    fs.mutex.Lock()
-    defer fs.mutex.Unlock()
+    fs.waitDataRequestChannelsMutex.Lock()
+    defer fs.waitDataRequestChannelsMutex.Unlock()
     _, channelExists := fs.waitDataRequestChannels[datahash]
     if channelExists {
         fs.waitDataRequestChannels[datahash] = nil
@@ -422,8 +401,8 @@ func (fs *FileSharing) removeChannelForHash(datahash string) {
 }
 
 func (fs *FileSharing) notifyChannelForHash(datahash string) {
-    fs.mutex.Lock()
-    defer fs.mutex.Unlock()
+    fs.waitDataRequestChannelsMutex.Lock()
+    defer fs.waitDataRequestChannelsMutex.Unlock()
     _, channelExists := fs.waitDataRequestChannels[datahash]
     if channelExists {
         fs.waitDataRequestChannels[datahash] <- true
@@ -454,6 +433,26 @@ func (fs *FileSharing) waitDataReply(dr *model.DataRequest) {
     }
 }
 
+func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
+    if dr.Destination == fs.gossiper.Name {
+        fs.HandleDataRequest(dr)
+        return
+    }
+
+    // Get hop-peer if existing
+    destPeer := fs.gossiper.GetNextHopForDest(dr.Destination)
+    if destPeer == "" {
+        return
+    }
+
+    gp := model.GossipPacket{DataRequest: dr}
+    go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
+
+    if dr.Origin == fs.gossiper.Name {
+        go fs.waitDataReply(dr)
+    }
+}
+
 func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
     if dr.Destination == fs.gossiper.Name {
         fs.HandleDataReply(dr)
@@ -467,10 +466,4 @@ func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
 
     gp := model.GossipPacket{DataReply: dr}
     go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
-}
-
-func hash(toHash []byte) []byte {
-    h := sha256.New()
-    h.Write(toHash)
-    return h.Sum(nil)
 }
