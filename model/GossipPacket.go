@@ -9,6 +9,8 @@ type GossipPacket struct {
     DataReply *DataReply
     SearchRequest *SearchRequest
     SearchReply *SearchReply
+    TxPublish *TxPublish
+    BlockPublish *BlockPublish
 }
 
 func (gp *GossipPacket) String(mode, relayAddr string) string {

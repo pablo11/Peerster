@@ -24,3 +24,10 @@ type FileMatch struct {
     // Map: chunck nb -> node having it
     ChunksLocation []string
 }
+
+// For blockchain filename to hash mapping
+type File struct {
+    Name string
+    Size int64
+    MetafileHash []byte
+}

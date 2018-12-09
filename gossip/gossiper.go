@@ -63,6 +63,16 @@ type Gossiper struct {
 
     FullMatches []*model.FileMatch
     FullMatchesMutex sync.Mutex
+
+    blockchain []*model.Block
+    blockchainMutex sync.Mutex
+
+    // Mapping of filenames in the blockchain
+    filesName map[string]*model.File
+    filesNameMutex sync.Mutex
+
+    filesForNextBlock []*model.File
+    filesForNextBlockMutex sync.Mutex
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -97,6 +107,13 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         activeSearchRequestsMutex: sync.Mutex{},
         FullMatches: make([]*model.FileMatch, 0),
         FullMatchesMutex: sync.Mutex{},
+
+        blockchain: make([]*model.Block, 0),
+        blockchainMutex: sync.Mutex{},
+        filesName: make(map[string]*model.File),
+        filesNameMutex: sync.Mutex{},
+        filesForNextBlock: make([]*model.File, 0),
+        filesForNextBlockMutex: sync.Mutex{},
     }
 }
 
@@ -193,6 +210,12 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
 
         case gp.SearchReply != nil:
             g.HandlePktSearchReply(gp)
+
+        case gp.TxPublish != nil:
+            g.HandlePktTxPublish(gp)
+
+        case gp.BlockPublish != nil:
+            g.HandlePktBlockPublish(gp)
 
         default:
             fmt.Println("WARNING: Unoknown message type")

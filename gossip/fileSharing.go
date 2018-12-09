@@ -64,7 +64,8 @@ func (fs *FileSharing) IndexFile(path string) {
         fmt.Println(err)
         return
     }
-    requiredNbChunks := int(math.Ceil(float64(fi.Size()) / MAX_CHUNK_SIZE))
+    filesize := fi.Size()
+    requiredNbChunks := int(math.Ceil(float64(filesize) / MAX_CHUNK_SIZE))
     if requiredNbChunks > int(MAX_CHUNK_SIZE / 32) {
         fmt.Println("ERROR: The file is too large to be indexed")
         fmt.Println()
@@ -121,6 +122,13 @@ func (fs *FileSharing) IndexFile(path string) {
         NbChunks: int(nbChunks),
         ChunksLocation: chunksLocation,
     }
+
+    // Publish file for blockchain
+    go fs.gossiper.SendTxPublish(&model.File{
+        Name: path,
+        Size: filesize,
+        MetafileHash: metaHash,
+    })
 }
 
 // If dest is "", the file is downloaded from multiple sources. Sources are
