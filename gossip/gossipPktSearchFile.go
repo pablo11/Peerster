@@ -5,6 +5,7 @@ import (
     "time"
     "strings"
     "math/rand"
+    "encoding/hex"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/collections"
 )
@@ -13,11 +14,12 @@ type ActiveSearch struct {
     Keywords []string
     LastBudget uint64
     NotifyChannel chan bool
-    // FileName -> FileChunksMatches
-    Matches map[string]*FileMatches
+    // Metahash -> FileMatch
+    Matches map[string]*FileMatch
 }
 
-type FileMatches struct {
+type FileMatch struct {
+    Filename string
     MetaHash []byte
     NbChunks uint64
     // Map: chunck nb -> node having it
@@ -75,7 +77,7 @@ func (g *Gossiper) budgetPropagation(budget uint64, origin string, keywords []st
     peersBudget := g.subdivideBudget(budget)
     if len(peersBudget) > 0 {
         for peerAddr, peerBudget := range peersBudget {
-            go g.sendSearchRequest(origin, peerBudget, keywords, peerAddr, false)
+            go g.sendSearchRequest(origin, peerBudget, keywords, peerAddr)
         }
     }
 }
@@ -127,12 +129,7 @@ func (g *Gossiper) sendSearchReply(sr *model.SearchReply) {
     go g.sendGossipPacket(&gp, []string{destPeer})
 }
 
-func (g *Gossiper) sendSearchRequest(origin string, budget uint64, keywords []string, destPeer string, randomPeer bool) {
-    peer := destPeer
-    if randomPeer {
-        peer = g.getNRandomPeers(1)[0]
-    }
-
+func (g *Gossiper) sendSearchRequest(origin string, budget uint64, keywords []string, destPeer string) {
     sr := model.SearchRequest{
         Origin: origin,
         Budget: budget,
@@ -140,7 +137,7 @@ func (g *Gossiper) sendSearchRequest(origin string, budget uint64, keywords []st
     }
 
     gp := model.GossipPacket{SearchRequest: &sr}
-    go g.sendGossipPacket(&gp, []string{peer})
+    go g.sendGossipPacket(&gp, []string{destPeer})
 }
 
 func (g *Gossiper) subdivideBudget(budget uint64) map[string]uint64 {
@@ -189,9 +186,9 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
     return randomPeers
 }
 
-func (g *Gossiper) startSearchRequest(budget uint64, keywords []string) {
-    if g.ActiveSearchRequest != nil && g.ActiveSearchRequest.LastBudget >= budget {
-        fmt.Println("WARNING: The SearchRequest is already beeing searched")
+func (g *Gossiper) startSearchRequest(budget uint64, keywords []string, startExpandingRing bool) {
+    if g.ActiveSearchRequest != nil /*&& g.ActiveSearchRequest.LastBudget >= budget*/ {
+        fmt.Println("WARNING: A SearchRequest is already beeing searched")
         return
     }
 
@@ -199,30 +196,27 @@ func (g *Gossiper) startSearchRequest(budget uint64, keywords []string) {
         Keywords: keywords,
         LastBudget: budget,
         NotifyChannel: make(chan bool),
-        Matches: make(map[string]*FileMatches)
+        Matches: make(map[string]*FileMatch),
     }
 
-    go g.sendSearchRequest(g.Name, budget, keywords, "", true)
-
-
-    // TODO: Propagate or not?
-
-/*
     // Propagate the SearchRequest subdividing the budget
-    g.budgetPropagation(sr.Budget, sr.Origin, sr.Keywords)
-*/
+    go g.budgetPropagation(budget, g.Name, keywords)
 
-    // Keep record of SearchRequests sent until 2 mathces are got, in the meantime
-    // every 1 second double the budget and sent a new request (up to a threshold of 32)
+    if startExpandingRing {
+        // Keep record of SearchRequests sent until 2 mathces are got, in the meantime
+        // every 1 second double the budget and sent a new request (up to a threshold of 32)
 
-    ticker := time.NewTicker(SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD * time.Second)
-    defer ticker.Stop()
+        ticker := time.NewTicker(SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD * time.Second)
+        defer ticker.Stop()
+    }
 
     select {
     case <-g.ActiveSearchRequest.NotifyChannel:
         // Match threshold reached, print
-        ticker.Stop()
-        g.ActiveSearchRequests = nil
+        if startExpandingRing {
+            ticker.Stop()
+        }
+        g.ActiveSearchRequest = nil
 
         fmt.Println("✅ 2 MATHCHES")
 
@@ -259,11 +253,18 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
 
     // Don't care about files that I already have
     for _, result := range sr.Results {
-        fmt.Println("FOUND match " + result.FileName + " at " + sr.Origin + " metafile=" + hex.EncodeToString(result.MetafileHash) + " chunks=" + strings.Join(result.ChunkMap, ","))
+        chunkMapStr := make([]string, len(result.ChunkMap))
+        for i := 0; i < len(result.ChunkMap); i++ {
+            chunkMapStr[i] = string(result.ChunkMap[i])
+        }
 
-        _, exists := g.ActiveSearchRequest.Match[result.FileName]
+        hexMetahash := hex.EncodeToString(result.MetafileHash)
+        fmt.Println("FOUND match " + result.FileName + " at " + sr.Origin + " metafile=" + hexMetahash + " chunks=" + strings.Join(chunkMapStr, ","))
+
+        _, exists := g.ActiveSearchRequest.Matches[hexMetahash]
         if !exists {
-            g.ActiveSearchRequest.Match[result.FileName] = &FileMatches{
+            g.ActiveSearchRequest.Matches[hexMetahash] = &FileMatch{
+                Filename: result.FileName,
                 MetaHash: result.MetafileHash,
                 NbChunks: result.ChunkCount,
                 Chunks: make(map[int]string),
@@ -272,27 +273,17 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
 
         // Store location of each chunk
         for _, chunkNb := range result.ChunkMap {
-            g.ActiveSearchRequest.Match[result.FileName].Chunks[chunkNb] = sr.Origin
+            g.ActiveSearchRequest.Matches[hexMetahash].Chunks[int(chunkNb)] = sr.Origin
+        }
+
+        // Check if it's a full match
+        if len(g.ActiveSearchRequest.Matches[hexMetahash].Chunks) == int(g.ActiveSearchRequest.Matches[hexMetahash].NbChunks) {
+            g.FullMatches = append(g.FullMatches, g.ActiveSearchRequest.Matches[hexMetahash])
+            if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
+                fmt.Println("SEARCH FINISHED")
+                g.ActiveSearchRequest.NotifyChannel <- true
+            }
+
         }
     }
-
-    // Check if there are full matches (files for which we have all chunks)
-    nbOfFullMatches := 0
-    for filename, fileMatches := range g.ActiveSearchRequest.Match {
-        if fileMatches.NbChunks == len(fileMatches.Chunks) {
-            nbOfFullMatches += 1
-        }
-    }
-
-    // Check if I have two matches, in that case send the signal to trigger the end of SearchRequest
-    if nbOfFullMatches >= SEARCH_REQUEST_MATCH_THRESHOLD {
-        fmt.Println("SEARCH FINISHED")
-        g.ActiveSearchRequest.NotifyChannel <- true
-
-
-        // TODO: send send back the full matchig files, since the ActiveSearchRequest
-        // will be overwritten at next SearchRequest
-
-    }
-
 }

@@ -57,6 +57,8 @@ type Gossiper struct {
 
     // Keep track of current SearchRequests
     ActiveSearchRequest *ActiveSearch
+
+    FullMatches []*FileMatch
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -85,6 +87,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         FileSharing: NewFileSharing(),
         ProcessingSearchRequests: make(map[string]bool),
         ActiveSearchRequest: nil,
+        FullMatches: make([]*FileMatch, 0),
     }
 }
 

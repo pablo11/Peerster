@@ -176,7 +176,7 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
 
     file, isAvailableFiles := fs.AvailableFiles[hex.EncodeToString(dr.HashValue)]
     if isAvailableFiles && file.MetaHash == nil {
-        fmt.Println("AvailableFiles metafile of " + file.LocalName + " from " + dr.Origin)
+        fmt.Println("DOWNLOADING metafile of " + file.LocalName + " from " + dr.Origin)
 
         nbChunks := len(dr.Data) / 32
 
@@ -209,7 +209,7 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
         for metahash, file := range fs.AvailableFiles {
             if file.NextChunkHash == hex.EncodeToString(dr.HashValue) {
                 fs.AvailableFiles[metahash].NextChunkOffset += 1
-                fmt.Println("AvailableFiles " + file.LocalName + " chunk", fs.AvailableFiles[metahash].NextChunkOffset, "from " + dr.Origin)
+                fmt.Println("DOWNLOADING " + file.LocalName + " chunk", fs.AvailableFiles[metahash].NextChunkOffset, "from " + dr.Origin)
                 nextChunkHash := fs.getChunkHashFromMetafile(metahash, file.NextChunkOffset)
                 if nextChunkHash == nil {
                     // The download is complete. Reconstruct the file and save it with the local name

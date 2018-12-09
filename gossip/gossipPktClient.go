@@ -25,11 +25,11 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
             go g.FileSharing.RequestFile(cm.File, cm.Dest, cm.Request)
 
         case "searchFile":
-
-            // TODO: if budget is specified -> do not increment budget every second
-
-
-            go g.startSearchRequest(cm.Budget, cm.Keywords)
+            if cm.Budget == 0 {
+                go g.startSearchRequest(2, cm.Keywords, true)
+            } else {
+                go g.startSearchRequest(cm.Budget, cm.Keywords, false)
+            }
 
         default:
             fmt.Println("WARNING: Unoknown client message type")

@@ -17,7 +17,7 @@ func main() {
     msg := flag.String("msg", "", "Message to be sent")
     request := flag.String("request", "", "Request a chunk or metafile of this hash")
     keywords := flag.String("keywords", "", "Keywords for the file search")
-    budget := flag.Int("budget", 2, "Budget for the file search")
+    budget := flag.Int("budget", 0, "Budget for the file search")
 
     flag.Parse()
 
@@ -61,7 +61,7 @@ func main() {
         cm := &model.ClientMessage{
             Type: "searchFile",
             Keywords: strings.Split(*keywords, ","),
-            Budget: *budget,
+            Budget: uint64(*budget),
         }
         sendPacket(cm, *uiPort)
         return
