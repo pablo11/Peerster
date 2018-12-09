@@ -116,6 +116,14 @@ func (fs *FileSharing) IndexFile(path string) {
     fmt.Println()
 
     _ = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
+
+    fs.AvailableFiles[hex.EncodeToString(metaHash)] = &FileDownload{
+        LocalName: path,
+        MetaHash: metaHash,
+        NextChunkOffset: int(nbChunks),
+        NextChunkHash: "",
+        NbChunks: int(nbChunks),
+    }
 }
 
 func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {

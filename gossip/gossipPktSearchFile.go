@@ -4,6 +4,7 @@ import (
     "fmt"
     "time"
     "strings"
+    "strconv"
     "math/rand"
     "encoding/hex"
     "github.com/pablo11/Peerster/model"
@@ -123,7 +124,13 @@ func (g *Gossiper) sendSearchReplyFor(dest string, results []*model.SearchResult
         Results: results,
     }
 
-    g.sendSearchReply(&sr)
+    if dest == g.Name {
+        // Handle search request from client
+        g.HandlePktSearchReply(&model.GossipPacket{SearchReply: &sr})
+
+    } else {
+        g.sendSearchReply(&sr)
+    }
 }
 
 func (g *Gossiper) sendSearchReply(sr *model.SearchReply) {
@@ -195,6 +202,8 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
 func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExpandingRing bool) {
     fmt.Println("💡 SEARCH STARTED for keywords=" + strings.Join(keywords, ","))
 
+    doLocalSearch := g.ActiveSearchRequest == nil
+
     if g.ActiveSearchRequest != nil && g.ActiveSearchRequest.LastBudget >= budget {
         fmt.Println("WARNING: A SearchRequest is already beeing searched")
         return
@@ -207,7 +216,9 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
         Matches: make(map[string]*FileMatch),
     }
 
-    go g.searchFileLocally(keywords, g.Name)
+    if doLocalSearch {
+        go g.searchFileLocally(keywords, g.Name)
+    }
 
     // Propagate the SearchRequest subdividing the budget
     go g.budgetPropagation(budget, g.Name, keywords)
@@ -267,7 +278,7 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
     for _, result := range sr.Results {
         chunkMapStr := make([]string, len(result.ChunkMap))
         for i := 0; i < len(result.ChunkMap); i++ {
-            chunkMapStr[i] = string(result.ChunkMap[i])
+            chunkMapStr[i] = strconv.Itoa(int(result.ChunkMap[i]))
         }
 
         hexMetahash := hex.EncodeToString(result.MetafileHash)

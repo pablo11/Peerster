@@ -14,7 +14,7 @@ function listFiles() {
 
         //console.log(data);
         var html = ""
-        for (var f of files) {
+        for (var f of data) {
             const b64pth = btoa(f.path)
             html += '<a href="/api/downloadFile?path=' + b64pth + '" target="_blank" class="list-group-item">' + f.name + '</a>'
         }

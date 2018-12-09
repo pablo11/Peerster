@@ -165,6 +165,8 @@ func (a *ApiHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
     defer f.Close()
     io.Copy(f, file)
 
+    go a.gossiper.FileSharing.IndexFile(handler.Filename)
+
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")
     w.WriteHeader(200)
@@ -253,7 +255,7 @@ func (a *ApiHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
 
     keywords := strings.Split(query[0], ",")
 
-    go a.gossiper.StartSearchRequest(2, keywords, true)
+    go a.gossiper.StartSearchRequest(2, keywords, false)
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")
