@@ -24,7 +24,7 @@ type FileMatch struct {
     MetaHash []byte
     NbChunks uint64
     // Map: chunck nb -> node having it
-    Chunks map[int]string
+    ChunksLocation []string
 }
 
 func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
@@ -290,17 +290,17 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
                 Filename: result.FileName,
                 MetaHash: result.MetafileHash,
                 NbChunks: result.ChunkCount,
-                Chunks: make(map[int]string),
+                ChunksLocation: make([]string, result.ChunkCount),
             }
         }
 
         // Store location of each chunk
         for _, chunkNb := range result.ChunkMap {
-            g.ActiveSearchRequest.Matches[hexMetahash].Chunks[int(chunkNb)] = sr.Origin
+            g.ActiveSearchRequest.Matches[hexMetahash].ChunksLocation[int(chunkNb)] = sr.Origin
         }
 
         // Check if it's a full match
-        if len(g.ActiveSearchRequest.Matches[hexMetahash].Chunks) == int(g.ActiveSearchRequest.Matches[hexMetahash].NbChunks) {
+        if len(g.ActiveSearchRequest.Matches[hexMetahash].ChunksLocation) == int(g.ActiveSearchRequest.Matches[hexMetahash].NbChunks) {
             g.FullMatches = append(g.FullMatches, g.ActiveSearchRequest.Matches[hexMetahash])
             if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
                 fmt.Println("SEARCH FINISHED")

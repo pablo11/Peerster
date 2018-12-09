@@ -25,6 +25,7 @@ type FileDownload struct {
     NextChunkOffset int
     NextChunkHash string
     NbChunks int
+    ChunksLocation []string
 }
 
 type FileSharing struct {
@@ -117,12 +118,18 @@ func (fs *FileSharing) IndexFile(path string) {
 
     _ = fs.writeBytesToFile(hex.EncodeToString(metaHash), metafile)
 
+    chunksLocation := make([]string, int(nbChunks))
+    for i, _ := range chunksLocation {
+        chunksLocation[i] = fs.gossiper.Name
+    }
+
     fs.AvailableFiles[hex.EncodeToString(metaHash)] = &FileDownload{
         LocalName: path,
         MetaHash: metaHash,
         NextChunkOffset: int(nbChunks),
         NextChunkHash: "",
         NbChunks: int(nbChunks),
+        ChunksLocation: chunksLocation,
     }
 }
 
@@ -135,7 +142,38 @@ func (fs *FileSharing) writeBytesToFile(hash string, buffer []byte) error {
     return err
 }
 
+// If dest is "", the file is downloaded from multiple sources. Sources are
+// retreived from the corresponding FullMatches entry
 func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
+    byteHash, err := hex.DecodeString(metahash)
+    if err != nil {
+        fmt.Println("ERROR: The provided request is not an hash")
+        return
+    }
+
+    chunksLocation := make([]string, MAX_CHUNK_SIZE / 32)
+    if dest == "" {
+        // Download from multiple sources
+        for _, fullMatch := range fs.gossiper.FullMatches {
+            if hex.EncodeToString(fullMatch.MetaHash) == metahash {
+                chunksLocation = fullMatch.ChunksLocation
+                dest = fullMatch.ChunksLocation[0]
+                filename = fullMatch.Filename
+            }
+        }
+
+        // Check if the FullMatch was found
+        if dest == "" {
+            fmt.Println("ERROR: Could not download file from multiple sources, the FullMatch is missing")
+            return
+        }
+    } else {
+        // Download from single origin dest
+        for i, _ := range chunksLocation {
+            chunksLocation[i] = dest
+        }
+    }
+
     // Add this file to the AvailableFiles map
     fs.AvailableFiles[metahash] = &FileDownload{
         LocalName: filename,
@@ -143,12 +181,7 @@ func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
         NextChunkOffset: 0,
         NextChunkHash: "",
         NbChunks: 0,
-    }
-
-    byteHash, err := hex.DecodeString(metahash)
-    if err != nil {
-        fmt.Println("ERROR: The provided request is not an hash")
-        return
+        ChunksLocation: chunksLocation,
     }
 
     // Prepare and send the request
@@ -201,7 +234,7 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
             return
         }
 
-        fs.requestData(dr.Origin, firstChunkHash)
+        fs.requestData(fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].ChunksLocation[0], firstChunkHash)
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NextChunkOffset = 0
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].MetaHash = dr.HashValue
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NextChunkHash = hex.EncodeToString(firstChunkHash)
@@ -224,7 +257,7 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
                     fs.reconstructFile(metahash, file.LocalName)
                 } else {
                     // Request next chunk
-                    fs.requestData(dr.Origin, nextChunkHash)
+                    fs.requestData(fs.AvailableFiles[metahash].ChunksLocation[file.NextChunkOffset], nextChunkHash)
                     fs.AvailableFiles[metahash].NextChunkHash = hex.EncodeToString(nextChunkHash)
                 }
 
