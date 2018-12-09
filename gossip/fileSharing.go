@@ -151,14 +151,10 @@ func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
         return
     }
 
-    // Check if the file is locally available
-
-
     // Prepare chunk locations
     chunksLocation := make([]string, MAX_CHUNK_SIZE / 32)
     if dest == "" {
         // Download from multiple sources
-        fs.gossiper.FullMatchesMutex.Lock()
         for _, fullMatch := range fs.gossiper.FullMatches {
             if hex.EncodeToString(fullMatch.MetaHash) == metahash {
                 chunksLocation = fullMatch.ChunksLocation
@@ -166,7 +162,6 @@ func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
                 filename = fullMatch.Filename
             }
         }
-        fs.gossiper.FullMatchesMutex.Unlock()
 
         // Check if the FullMatch was found
         if dest == "" {

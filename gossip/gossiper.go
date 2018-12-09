@@ -139,8 +139,6 @@ func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
 }
 
 func (g *Gossiper) GetFullMatches() []*FileMatch {
-    g.FullMatchesMutex.Lock()
-    defer g.FullMatchesMutex.Unlock()
     return g.FullMatches
 }
 
@@ -469,26 +467,23 @@ func (g *Gossiper) AddPeer(peer string) {
 
 // Adds the node with name "origin" to the status and messages maps if not already present
 func (g *Gossiper) addNewNode(origin string) {
-    g.statusMutex.Lock()
-    defer g.statusMutex.Unlock()
-    g.messagesMutex.Lock()
-    defer g.messagesMutex.Unlock()
-
     _, isInStatusMap := g.status[origin]
     _, isInMessagesMap := g.messages[origin]
 
     if !isInStatusMap || !isInMessagesMap {
+        g.statusMutex.Lock()
         g.status[origin] = &model.PeerStatus{
             Identifier: origin,
             NextID: 1,
         }
+        g.statusMutex.Unlock()
+        g.messagesMutex.Lock()
         g.messages[origin] = make([]*model.RumorMessage, 0, 1024)
+        g.messagesMutex.Unlock()
     }
 }
 
 func (g *Gossiper) getVectorClock(origin string) uint32 {
-    g.statusMutex.Lock()
-    defer g.statusMutex.Unlock()
     g.addNewNode(origin)
     return g.status[origin].NextID
 }
@@ -513,8 +508,6 @@ func (g *Gossiper) storeMessage(rm *model.RumorMessage, storeForGUI bool) {
 }
 
 func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
-    g.statusMutex.Lock()
-    defer g.statusMutex.Unlock()
     if vector, isPresent := g.status[rm.Origin]; isPresent && rm.ID < vector.NextID {
         return
     }

@@ -293,7 +293,6 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
         fmt.Println("FOUND match " + result.FileName + " at " + sr.Origin + " metafile=" + hexMetahash + " chunks=" + strings.Join(chunkMapStr, ","))
 
         g.activeSearchRequestMutex.Lock()
-        defer g.activeSearchRequestMutex.Unlock()
 
         _, exists := g.activeSearchRequest.Matches[hexMetahash]
         if !exists {
@@ -319,7 +318,8 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
                 g.activeSearchRequest.NotifyChannel <- true
             }
             g.FullMatchesMutex.Unlock()
-
         }
+
+        g.activeSearchRequestMutex.Unlock()
     }
 }
