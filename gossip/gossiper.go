@@ -33,32 +33,39 @@ type Gossiper struct {
 
     // For rumoring
     nextMessageId uint32
-    status map[string]*model.PeerStatus
-    messages map[string][]*model.RumorMessage
 
-    // Mutex to lock structures on modification
-    mutex sync.Mutex
+    status map[string]*model.PeerStatus
+    statusMutex sync.Mutex
+
+    messages map[string][]*model.RumorMessage
+    messagesMutex sync.Mutex
 
     // Channel for wait for acknowledgement event
     waitStatusChannel map[string]chan bool
+    waitStatusChannelMutex sync.Mutex
 
     // List of every message received to send to the web interface
     allMessages []*model.RumorMessage
+    allMessagesMutex sync.Mutex
 
     // Routing table Origin->ip:port
     routingTable map[string]string
+    routingTableMutex sync.Mutex
 
     rtimer time.Duration
 
     FileSharing *FileSharing
 
     // Array containing SearchRequest uid received in the last 0.5 seconds
-    ProcessingSearchRequests map[string]bool
+    processingSearchRequests map[string]bool
+    processingSearchRequestsMutex sync.Mutex
 
     // Keep track of current SearchRequests
-    ActiveSearchRequest *ActiveSearch
+    activeSearchRequest *ActiveSearch
+    activeSearchRequestMutex sync.Mutex
 
     FullMatches []*FileMatch
+    FullMatchesMutex sync.Mutex
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -76,18 +83,23 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         simple: simple,
         nextMessageId: 1,
         status: make(map[string]*model.PeerStatus),
+        statusMutex: sync.Mutex{},
         messages: make(map[string][]*model.RumorMessage),
-
-        mutex: sync.Mutex{},
-
+        messagesMutex: sync.Mutex{},
         waitStatusChannel: make(map[string]chan bool),
-        //allMessages: make([]*model.RumorMessage),
+        waitStatusChannelMutex: sync.Mutex{},
+        allMessages: make([]*model.RumorMessage, 0),
+        allMessagesMutex: sync.Mutex{},
         routingTable: make(map[string]string),
+        routingTableMutex: sync.Mutex{},
         rtimer: time.Duration(rtimer),
         FileSharing: NewFileSharing(),
-        ProcessingSearchRequests: make(map[string]bool),
-        ActiveSearchRequest: nil,
+        processingSearchRequests: make(map[string]bool),
+        processingSearchRequestsMutex: sync.Mutex{},
+        activeSearchRequest: nil,
+        activeSearchRequestMutex: sync.Mutex{},
         FullMatches: make([]*FileMatch, 0),
+        FullMatchesMutex: sync.Mutex{},
     }
 }
 
@@ -115,14 +127,20 @@ func (g *Gossiper) GetPeers() []string {
 }
 
 func (g *Gossiper) GetOrigins() []string {
+    g.routingTableMutex.Lock()
+    defer g.routingTableMutex.Unlock()
     return collections.MapKeys(g.routingTable)
 }
 
 func (g *Gossiper) GetAllMessages() []*model.RumorMessage {
+    g.allMessagesMutex.Lock()
+    defer g.allMessagesMutex.Unlock()
     return g.allMessages
 }
 
 func (g *Gossiper) GetFullMatches() []*FileMatch {
+    g.FullMatchesMutex.Lock()
+    defer g.FullMatchesMutex.Unlock()
     return g.FullMatches
 }
 
@@ -324,7 +342,9 @@ func (g *Gossiper) SendPrivateMessage(pm *model.PrivateMessage) {
 }
 
 func (g *Gossiper) GetNextHopForDest(dest string) string {
+    g.routingTableMutex.Lock()
     destPeer, destExists := g.routingTable[dest]
+    g.routingTableMutex.Unlock()
     if !destExists {
         fmt.Println("WARNING: Node " + dest + " not in the routing table")
         return ""
@@ -357,8 +377,8 @@ func (g *Gossiper) waitStatusAcknowledgement(fromAddr string, rm *model.RumorMes
 }
 
 func (g *Gossiper) getChannelForPeer(addr string) chan bool {
-    g.mutex.Lock()
-    defer g.mutex.Unlock()
+    g.waitStatusChannelMutex.Lock()
+    defer g.waitStatusChannelMutex.Unlock()
     _, channelExists := g.waitStatusChannel[addr]
     if !channelExists {
         g.waitStatusChannel[addr] = make(chan bool, 8)
@@ -367,8 +387,8 @@ func (g *Gossiper) getChannelForPeer(addr string) chan bool {
 }
 
 func (g *Gossiper) removeChannelForPeer(addr string) {
-    g.mutex.Lock()
-    defer g.mutex.Unlock()
+    g.waitStatusChannelMutex.Lock()
+    defer g.waitStatusChannelMutex.Unlock()
     _, channelExists := g.waitStatusChannel[addr]
     if channelExists {
         g.waitStatusChannel[addr] = nil
@@ -391,9 +411,11 @@ func (g *Gossiper) flipCoin(rm *model.RumorMessage) {
 func (g *Gossiper) sendStatusMessage(toPeer string) {
     // Prepare the list of wanted messages
     wantedList := make([]model.PeerStatus, 0)
+    g.statusMutex.Lock()
     for _, vc := range g.status {
         wantedList = append(wantedList, *vc)
     }
+    g.statusMutex.Unlock()
 
     sp := model.StatusPacket{Want: wantedList}
     gp := model.GossipPacket{Status: &sp}
@@ -447,6 +469,11 @@ func (g *Gossiper) AddPeer(peer string) {
 
 // Adds the node with name "origin" to the status and messages maps if not already present
 func (g *Gossiper) addNewNode(origin string) {
+    g.statusMutex.Lock()
+    defer g.statusMutex.Unlock()
+    g.messagesMutex.Lock()
+    defer g.messagesMutex.Unlock()
+
     _, isInStatusMap := g.status[origin]
     _, isInMessagesMap := g.messages[origin]
 
@@ -460,33 +487,45 @@ func (g *Gossiper) addNewNode(origin string) {
 }
 
 func (g *Gossiper) getVectorClock(origin string) uint32 {
+    g.statusMutex.Lock()
+    defer g.statusMutex.Unlock()
     g.addNewNode(origin)
     return g.status[origin].NextID
 }
 
 func (g *Gossiper) incrementVectorClock(origin string) {
+    g.statusMutex.Lock()
 	g.status[origin].NextID += 1
+    g.statusMutex.Unlock()
 }
 
 func (g *Gossiper) storeMessage(rm *model.RumorMessage, storeForGUI bool) {
+    g.messagesMutex.Lock()
 	g.messages[rm.Origin] = append(g.messages[rm.Origin], rm)
+    g.messagesMutex.Unlock()
 
     if storeForGUI {
         // Add message also to allMessages for webserver
+        g.allMessagesMutex.Lock()
         g.allMessages = append(g.allMessages, rm)
+        g.allMessagesMutex.Unlock()
     }
 }
 
 func (g *Gossiper) updateRoutingTable(rm *model.RumorMessage, fromAddr string) {
+    g.statusMutex.Lock()
+    defer g.statusMutex.Unlock()
     if vector, isPresent := g.status[rm.Origin]; isPresent && rm.ID < vector.NextID {
         return
     }
 
+    g.routingTableMutex.Lock()
     if g.routingTable[rm.Origin] != fromAddr {
         g.routingTable[rm.Origin] = fromAddr
         fmt.Println("DSDV " + rm.Origin + " " + fromAddr)
         fmt.Println()
     }
+    g.routingTableMutex.Unlock()
 }
 
 /* HELPERS */

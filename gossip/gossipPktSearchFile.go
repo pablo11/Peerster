@@ -91,27 +91,27 @@ func (g *Gossiper) budgetPropagation(budget uint64, origin string, keywords []st
 
 // Returns a boolean indicating if the request is a duplicate
 func (g *Gossiper) checkDuplicateSearchRequests(origin string, keywords []string) bool {
-    g.mutex.Lock()
+    g.processingSearchRequestsMutex.Lock()
 
     // Search for duplicate
     searchRequestUid := origin + strings.Join(keywords, ",")
-    _, isDuplicate := g.ProcessingSearchRequests[searchRequestUid]
+    _, isDuplicate := g.processingSearchRequests[searchRequestUid]
     if isDuplicate {
+        g.processingSearchRequestsMutex.Unlock()
         return true
     }
 
     // If it isn't a duplicate, put it in the ProcessingSearchRequests array and
     // set a timer to remove it after SEARCH_REQUEST_DUPLICATE_PERIOD seconds
-    g.ProcessingSearchRequests[searchRequestUid] = true
+    g.processingSearchRequests[searchRequestUid] = true
 
-    g.mutex.Unlock()
+    g.processingSearchRequestsMutex.Unlock()
 
     go func() {
-        g.mutex.Lock()
-        defer g.mutex.Unlock()
-
         time.Sleep(SEARCH_REQUEST_DUPLICATE_PERIOD * time.Millisecond)
-        delete(g.ProcessingSearchRequests, searchRequestUid)
+        g.processingSearchRequestsMutex.Lock()
+        delete(g.processingSearchRequests, searchRequestUid)
+        defer g.processingSearchRequestsMutex.Unlock()
     }()
     return false
 }
@@ -147,7 +147,6 @@ func (g *Gossiper) sendSearchRequest(origin string, budget uint64, keywords []st
         Budget: budget,
         Keywords: keywords,
     }
-
     gp := model.GossipPacket{SearchRequest: &sr}
     go g.sendGossipPacket(&gp, []string{destPeer})
 }
@@ -159,7 +158,7 @@ func (g *Gossiper) subdivideBudget(budget uint64) map[string]uint64 {
         return peersBudget
     }
 
-    if budget > nbPeers {
+    if budget >= nbPeers {
         // Divide the budget among all peers
         minBudgetPerPeer := budget / nbPeers
         for _, p := range g.peers {
@@ -206,14 +205,17 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
         return
     }
 
-    doLocalSearch := g.ActiveSearchRequest == nil
+    g.activeSearchRequestMutex.Lock()
+    defer g.activeSearchRequestMutex.Unlock()
 
-    if g.ActiveSearchRequest != nil && g.ActiveSearchRequest.LastBudget >= budget {
+    doLocalSearch := g.activeSearchRequest == nil
+
+    if g.activeSearchRequest != nil && g.activeSearchRequest.LastBudget >= budget {
         fmt.Println("WARNING: A SearchRequest is already beeing searched")
         return
     }
 
-    g.ActiveSearchRequest = &ActiveSearch{
+    g.activeSearchRequest = &ActiveSearch{
         Keywords: keywords,
         LastBudget: budget,
         NotifyChannel: make(chan bool),
@@ -234,12 +236,14 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
     defer ticker.Stop()
 
     select {
-    case <-g.ActiveSearchRequest.NotifyChannel:
+    case <-g.activeSearchRequest.NotifyChannel:
         // Match threshold reached, print
         if startExpandingRing {
             ticker.Stop()
         }
-        g.ActiveSearchRequest = nil
+        g.activeSearchRequestMutex.Lock()
+        g.activeSearchRequest = nil
+        g.activeSearchRequestMutex.Unlock()
 
         fmt.Println("✅ 2 MATHCHES")
 
@@ -288,9 +292,12 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
         hexMetahash := hex.EncodeToString(result.MetafileHash)
         fmt.Println("FOUND match " + result.FileName + " at " + sr.Origin + " metafile=" + hexMetahash + " chunks=" + strings.Join(chunkMapStr, ","))
 
-        _, exists := g.ActiveSearchRequest.Matches[hexMetahash]
+        g.activeSearchRequestMutex.Lock()
+        defer g.activeSearchRequestMutex.Unlock()
+
+        _, exists := g.activeSearchRequest.Matches[hexMetahash]
         if !exists {
-            g.ActiveSearchRequest.Matches[hexMetahash] = &FileMatch{
+            g.activeSearchRequest.Matches[hexMetahash] = &FileMatch{
                 Filename: result.FileName,
                 MetaHash: result.MetafileHash,
                 NbChunks: result.ChunkCount,
@@ -300,16 +307,18 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
 
         // Store location of each chunk
         for _, chunkNb := range result.ChunkMap {
-            g.ActiveSearchRequest.Matches[hexMetahash].ChunksLocation[int(chunkNb) - 1] = sr.Origin
+            g.activeSearchRequest.Matches[hexMetahash].ChunksLocation[int(chunkNb) - 1] = sr.Origin
         }
 
         // Check if it's a full match
-        if len(g.ActiveSearchRequest.Matches[hexMetahash].ChunksLocation) == int(g.ActiveSearchRequest.Matches[hexMetahash].NbChunks) {
-            g.FullMatches = append(g.FullMatches, g.ActiveSearchRequest.Matches[hexMetahash])
+        if len(g.activeSearchRequest.Matches[hexMetahash].ChunksLocation) == int(g.activeSearchRequest.Matches[hexMetahash].NbChunks) {
+            g.FullMatchesMutex.Lock()
+            g.FullMatches = append(g.FullMatches, g.activeSearchRequest.Matches[hexMetahash])
             if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
                 fmt.Println("SEARCH FINISHED")
-                g.ActiveSearchRequest.NotifyChannel <- true
+                g.activeSearchRequest.NotifyChannel <- true
             }
+            g.FullMatchesMutex.Unlock()
 
         }
     }
