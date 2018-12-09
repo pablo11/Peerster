@@ -60,9 +60,9 @@ type Gossiper struct {
     processingSearchRequests map[string]bool
     processingSearchRequestsMutex sync.Mutex
 
-    // Keep track of current SearchRequests
-    activeSearchRequest *ActiveSearch
-    activeSearchRequestMutex sync.Mutex
+    // Keep track of current SearchRequests: mapping from keywords to ActiveSearch
+    activeSearchRequests map[string]*ActiveSearch
+    activeSearchRequestsMutex sync.Mutex
 
     FullMatches []*FileMatch
     FullMatchesMutex sync.Mutex
@@ -96,8 +96,8 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         FileSharing: NewFileSharing(),
         processingSearchRequests: make(map[string]bool),
         processingSearchRequestsMutex: sync.Mutex{},
-        activeSearchRequest: nil,
-        activeSearchRequestMutex: sync.Mutex{},
+        activeSearchRequests: make(map[string]*ActiveSearch),
+        activeSearchRequestsMutex: sync.Mutex{},
         FullMatches: make([]*FileMatch, 0),
         FullMatchesMutex: sync.Mutex{},
     }
