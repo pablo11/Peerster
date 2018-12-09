@@ -151,6 +151,10 @@ func (fs *FileSharing) RequestFile(filename, dest, metahash string) {
         return
     }
 
+    // Check if the file is locally available
+
+
+    // Prepare chunk locations
     chunksLocation := make([]string, MAX_CHUNK_SIZE / 32)
     if dest == "" {
         // Download from multiple sources
@@ -234,11 +238,11 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
             return
         }
 
-        fs.requestData(fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].ChunksLocation[0], firstChunkHash)
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NextChunkOffset = 0
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].MetaHash = dr.HashValue
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NextChunkHash = hex.EncodeToString(firstChunkHash)
         fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].NbChunks = nbChunks
+        fs.requestData(fs.AvailableFiles[hex.EncodeToString(dr.HashValue)].ChunksLocation[0], firstChunkHash)
     } else {
         // Store the chunk
         err := fs.writeBytesToFile(hex.EncodeToString(dr.HashValue), dr.Data)
@@ -257,8 +261,8 @@ func (fs *FileSharing) HandleDataReply(dr *model.DataReply) {
                     fs.reconstructFile(metahash, file.LocalName)
                 } else {
                     // Request next chunk
-                    fs.requestData(fs.AvailableFiles[metahash].ChunksLocation[file.NextChunkOffset], nextChunkHash)
                     fs.AvailableFiles[metahash].NextChunkHash = hex.EncodeToString(nextChunkHash)
+                    fs.requestData(fs.AvailableFiles[metahash].ChunksLocation[file.NextChunkOffset], nextChunkHash)
                 }
 
                 return
@@ -375,12 +379,17 @@ func (fs *FileSharing) requestData(dest string, hashValue []byte) {
         HashValue: hashValue,
     }
 
-    fmt.Println("REQUESTING DATA " + hex.EncodeToString(hashValue))
+    //fmt.Println("REQUESTING DATA " + hex.EncodeToString(hashValue))
 
     fs.sendDataRequest(&dr)
 }
 
 func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
+    if dr.Destination == fs.gossiper.Name {
+        fs.HandleDataRequest(dr)
+        return
+    }
+
     // Get hop-peer if existing
     destPeer := fs.gossiper.GetNextHopForDest(dr.Destination)
     if destPeer == "" {
@@ -447,6 +456,11 @@ func (fs *FileSharing) waitDataReply(dr *model.DataRequest) {
 }
 
 func (fs *FileSharing) sendDataReply(dr *model.DataReply) {
+    if dr.Destination == fs.gossiper.Name {
+        fs.HandleDataReply(dr)
+        return
+    }
+
     destPeer := fs.gossiper.GetNextHopForDest(dr.Destination)
     if destPeer == "" {
         return

@@ -178,17 +178,23 @@ func (a *ApiHandler) RequestFile(w http.ResponseWriter, r *http.Request) {
     filename, isFilenamePresent := r.PostForm["filename"]
     dest, isDestPresent := r.PostForm["dest"]
     hash, isHashPresent := r.PostForm["hash"]
-    if !isFilenamePresent || len(filename) != 1 || !isDestPresent || len(dest) != 1 || !isHashPresent || len(hash) != 1 || dest[0] == "0" {
+    if !isHashPresent || len(hash) != 1 {
         w.Header().Set("Server", "Cryptop GO server")
         w.WriteHeader(400)
         return
     }
 
-    filenameStr := filename[0]
-    destStr := dest[0]
     hashStr := hash[0]
 
-    go a.gossiper.FileSharing.RequestFile(filenameStr, destStr, hashStr)
+    if isFilenamePresent && len(filename) == 1 && isDestPresent && len(dest) == 1 && dest[0] != "0" {
+        go a.gossiper.FileSharing.RequestFile(filename[0], dest[0], hashStr)
+    } else if !isFilenamePresent && !isDestPresent {
+        go a.gossiper.FileSharing.RequestFile("", "", hashStr)
+    } else {
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")
@@ -196,10 +202,12 @@ func (a *ApiHandler) RequestFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *ApiHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
+    /*
     filesShared, err := ioutil.ReadDir(SHARED_FILES_DIR)
     if err != nil {
         fmt.Println(err)
     }
+    */
 
     filesDownloaded, err := ioutil.ReadDir(DOWNLOADED_FILES_DIR)
     if err != nil {
@@ -207,11 +215,13 @@ func (a *ApiHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
     }
 
     filesJson := make([]string, 0)
+    /*
     for _, f := range filesShared {
         if !strings.HasPrefix(f.Name(), ".") {
             filesJson = append(filesJson, "{\"path\": \"" + SHARED_FILES_DIR + f.Name() + "\", \"name\": \"" + f.Name() + "\"}")
         }
     }
+    */
     for _, f := range filesDownloaded {
         if !strings.HasPrefix(f.Name(), ".") {
             filesJson = append(filesJson, "{\"path\": \"" + DOWNLOADED_FILES_DIR + f.Name() + "\", \"name\": \"" + f.Name() + "\"}")

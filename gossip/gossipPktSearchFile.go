@@ -30,7 +30,7 @@ type FileMatch struct {
 func (g *Gossiper) HandlePktSearchRequest(gp *model.GossipPacket) {
     sr := gp.SearchRequest
     // Discard SearchRequest if it's a duplicate
-    if g.checkDuplicateSearchRequests(sr) {
+    if g.checkDuplicateSearchRequests(sr.Origin, sr.Keywords) {
         return
     }
 
@@ -90,11 +90,11 @@ func (g *Gossiper) budgetPropagation(budget uint64, origin string, keywords []st
 }
 
 // Returns a boolean indicating if the request is a duplicate
-func (g *Gossiper) checkDuplicateSearchRequests(sr *model.SearchRequest) bool {
+func (g *Gossiper) checkDuplicateSearchRequests(origin string, keywords []string) bool {
     g.mutex.Lock()
 
     // Search for duplicate
-    searchRequestUid := sr.Origin + strings.Join(sr.Keywords, ",")
+    searchRequestUid := origin + strings.Join(keywords, ",")
     _, isDuplicate := g.ProcessingSearchRequests[searchRequestUid]
     if isDuplicate {
         return true
@@ -127,7 +127,6 @@ func (g *Gossiper) sendSearchReplyFor(dest string, results []*model.SearchResult
     if dest == g.Name {
         // Handle search request from client
         g.HandlePktSearchReply(&model.GossipPacket{SearchReply: &sr})
-
     } else {
         g.sendSearchReply(&sr)
     }
@@ -201,6 +200,11 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
 
 func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExpandingRing bool) {
     fmt.Println("💡 SEARCH STARTED for keywords=" + strings.Join(keywords, ","))
+
+    // Discard SearchRequest if it's a duplicate
+    if g.checkDuplicateSearchRequests(g.Name, keywords) {
+        return
+    }
 
     doLocalSearch := g.ActiveSearchRequest == nil
 
@@ -296,7 +300,7 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
 
         // Store location of each chunk
         for _, chunkNb := range result.ChunkMap {
-            g.ActiveSearchRequest.Matches[hexMetahash].ChunksLocation[int(chunkNb)] = sr.Origin
+            g.ActiveSearchRequest.Matches[hexMetahash].ChunksLocation[int(chunkNb) - 1] = sr.Origin
         }
 
         // Check if it's a full match

@@ -1,5 +1,9 @@
 $(document).ready(function() {
     listFiles()
+    setInterval(function() {
+        listFiles()
+    }, 2000)
+
     setupFileUpload()
     setupRequestFile()
     setupSearchFile()
@@ -131,9 +135,18 @@ function getAndDisplaySearchResults() {
 
         var html = ""
         for (var res of data) {
-            html += '<a href="#" data-metahash="' + res.metahash + '" class="list-group-item">' + res.filename + '</a>'
+            html += '<a href="#" onclick=requestFileFromSearchResult(\"' + res.metahash + '\") class="list-group-item">' + res.filename + '</a>'
         }
 
         $("#listSearchResults").html(html)
     })
+}
+
+function requestFileFromSearchResult(metahash) {
+    $.post("api/requestFile", {
+        hash: metahash
+    }, function(data, status) {
+        window.alert("The file was requested, it'll be shortly available in the list of Available files")
+    })
+
 }
