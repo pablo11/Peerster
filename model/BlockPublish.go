@@ -1,10 +1,13 @@
 package model
 
 import (
+    "fmt"
     "encoding/binary"
     "crypto/sha256"
     "math/rand"
     "bytes"
+    "encoding/hex"
+    "strings"
 )
 
 type BlockPublish struct {
@@ -37,7 +40,9 @@ func (b *Block) Mine() [32]byte {
         rand.Read(nonce[:])
         b.Nonce = nonce
         if b.IsValid() {
-            return b.Hash()
+            hash := b.Hash()
+            fmt.Println("FOUND-BLOCK " + hex.EncodeToString(hash[:]))
+            return hash
         }
     }
 }
@@ -45,4 +50,13 @@ func (b *Block) Mine() [32]byte {
 func (b *Block) IsValid() bool {
     blockHash := b.Hash()
     return bytes.Equal(blockHash[0:2], []byte{0, 0})
+}
+
+func (b *Block) String() string {
+    filenames := make([]string, len(b.Transactions))
+    for i, trx := range b.Transactions {
+        filenames[i] = trx.File.Name
+    }
+    blockHash := b.Hash()
+    return hex.EncodeToString(blockHash[:]) + ":" + hex.EncodeToString(b.PrevHash[:]) + ":" + strings.Join(filenames, ",")
 }

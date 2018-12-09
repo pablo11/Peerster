@@ -4,6 +4,7 @@ import (
     "fmt"
     "bytes"
     //"encoding/hex"
+    "time"
     "github.com/pablo11/Peerster/model"
 )
 
@@ -15,7 +16,7 @@ func (g *Gossiper) HandlePktTxPublish(gp *model.GossipPacket) {
     // Check if I have already seen this transactions since the last block mined
     g.filesForNextBlockMutex.Lock()
     for _, pendingFile := range g.filesForNextBlock {
-        if bytes.Equal(pendingFile.MetafileHash, tp.File.MetafileHash) && pendingFile.Name == tp.File.Name && pendingFile.Size == tp.File.Size {
+        if bytes.Equal(pendingFile.File.MetafileHash, tp.File.MetafileHash) && pendingFile.File.Name == tp.File.Name && pendingFile.File.Size == tp.File.Size {
             g.filesForNextBlockMutex.Unlock()
             fmt.Println("Discarding TxPublish since already received")
             return
@@ -34,9 +35,7 @@ func (g *Gossiper) HandlePktTxPublish(gp *model.GossipPacket) {
     g.filesNameMutex.Unlock()
 
     // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-    g.filesForNextBlockMutex.Lock()
-    g.filesForNextBlock = append(g.filesForNextBlock, &tp.File)
-    g.filesForNextBlockMutex.Unlock()
+    g.addTxPublishToPool(tp)
 
     // If HopLimit is > 1 decrement and broadcast
     if tp.HopLimit > 1 {
@@ -59,10 +58,17 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
     }
     g.blockchainMutex.Unlock()
 
-    // Check if it's the genesis block
-    isGenesisBlock := true
-    for _, b := range bp.Block.PrevHash {
-        isGenesisBlock = isGenesisBlock && b == byte(0)
+    isGenesisBlock := false
+    if !parentInBlockchain {
+        // Check if it's the genesis block
+        isGenesisBlock = bytes.Equal(bp.Block.PrevHash[:], make([]byte, 32))
+
+        /*
+        isGenesisBlock = true
+        for _, b := range bp.Block.PrevHash {
+            isGenesisBlock = isGenesisBlock && b == byte(0)
+        }
+        */
     }
 
     if !parentInBlockchain && !isGenesisBlock {
@@ -81,6 +87,8 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
     g.blockchain = append(g.blockchain, &bp.Block)
     g.blockchainMutex.Unlock()
 
+    g.printBlockchain()
+
     // Integrate transactions in the filesName mapping
     g.filesNameMutex.Lock()
     for _, trx := range bp.Block.Transactions {
@@ -93,6 +101,15 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
         bp.HopLimit -= 1
         g.broadcastBlockPublish(bp)
     }
+}
+
+func (g *Gossiper) printBlockchain() {
+    chainStr := ""
+    for i := len(g.blockchain) - 1; i >= 0; i-- {
+        chainStr += " " + g.blockchain[i].String()
+    }
+
+    fmt.Println("CHAIN" + chainStr)
 }
 
 func (g *Gossiper) broadcastTxPublish(tp *model.TxPublish) {
@@ -111,5 +128,80 @@ func (g *Gossiper) SendTxPublish(file *model.File) {
         HopLimit: 10,
     }
 
+    // Add the transaction to the pool of transactions to be added in the next block
+    g.addTxPublishToPool(&tp)
+
     g.broadcastTxPublish(&tp)
+}
+
+func (g *Gossiper) addTxPublishToPool(tp *model.TxPublish) {
+    // Add only if not already there
+    g.filesForNextBlockMutex.Lock()
+    alreadyPresnet := false
+    for _, trx := range g.filesForNextBlock {
+        if trx.File.Name == tp.File.Name && trx.File.Size == tp.File.Size && bytes.Equal(trx.File.MetafileHash, tp.File.MetafileHash) {
+            alreadyPresnet = true
+        }
+    }
+
+    if !alreadyPresnet {
+        g.filesForNextBlock = append(g.filesForNextBlock, tp)
+    }
+    g.filesForNextBlockMutex.Unlock()
+}
+
+func (g *Gossiper) startMining() {
+    time.Sleep(GENESIS_BLOCK_WAIT_TIME * time.Second)
+
+    fmt.Println("START MINING " + time.Now().String())
+
+    var zeroBytes [32]byte = [32]byte{}
+
+    for {
+        if len(g.filesForNextBlock) > 0 {
+
+            // Create the block from filesForNextBlock
+            g.blockchainMutex.Lock()
+            var prevHash [32]byte = [32]byte{} //zeroBytes[0:32]
+            if len(g.blockchain) > 0 {
+                prevHash = g.blockchain[len(g.blockchain) - 1].Hash()
+            }
+            g.blockchainMutex.Unlock()
+
+            g.filesForNextBlockMutex.Lock()
+            transactions := make([]model.TxPublish, len(g.filesForNextBlock))
+            for i, trx := range g.filesForNextBlock {
+                transactions[i] = *trx
+            }
+            g.filesForNextBlockMutex.Unlock()
+
+            block := model.Block{
+                PrevHash: prevHash,
+                Nonce: zeroBytes,
+                Transactions: transactions,
+            }
+
+            // Mine block
+            _ = block.Mine()
+
+            // Remove transactions mined from the filesForNextBlock (assume that there are no new TxPhublish added in the middle of the list)
+            g.filesForNextBlockMutex.Lock()
+            g.filesForNextBlock = g.filesForNextBlock[len(transactions):len(g.filesForNextBlock)]
+            g.filesForNextBlockMutex.Unlock()
+
+            g.broadcastBlockPublish(&model.BlockPublish{
+                Block: block,
+                HopLimit: 20,
+            })
+
+            // Add block to blockchain
+            g.blockchainMutex.Lock()
+            g.blockchain = append(g.blockchain, &block)
+            g.blockchainMutex.Unlock()
+        } else {
+            // Wait a bit before checking again
+            time.Sleep(500 * time.Millisecond)
+        }
+    }
+
 }

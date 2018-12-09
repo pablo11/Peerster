@@ -22,6 +22,7 @@ const (
     SEARCH_REQUEST_BUDGET_DOUBLING_PERIOD time.Duration = 1
     MAX_SEARCH_BUDGET uint64 = 32
     SEARCH_REQUEST_MATCH_THRESHOLD int = 2
+    GENESIS_BLOCK_WAIT_TIME time.Duration = 5
 )
 
 type Gossiper struct {
@@ -71,7 +72,7 @@ type Gossiper struct {
     filesName map[string]*model.File
     filesNameMutex sync.Mutex
 
-    filesForNextBlock []*model.File
+    filesForNextBlock []*model.TxPublish
     filesForNextBlockMutex sync.Mutex
 }
 
@@ -112,7 +113,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         blockchainMutex: sync.Mutex{},
         filesName: make(map[string]*model.File),
         filesNameMutex: sync.Mutex{},
-        filesForNextBlock: make([]*model.File, 0),
+        filesForNextBlock: make([]*model.TxPublish, 0),
         filesForNextBlockMutex: sync.Mutex{},
     }
 }
@@ -130,6 +131,7 @@ func (g *Gossiper) Run(uiPort string) {
         go g.SendPublicMessage("", false)
         go g.startRouteRumoring()
     }
+    go g.startMining()
 }
 
 func (g *Gossiper) GetAddress() string {
