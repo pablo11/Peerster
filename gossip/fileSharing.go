@@ -341,8 +341,8 @@ func (fs *FileSharing) reconstructFile(metahash, filename string) {
 func (fs *FileSharing) readChunkFile(hash string) []byte {
     data, err := ioutil.ReadFile(CHUNKS_DIR + hash)
     if (err != nil) {
-        fmt.Println("ERROR: While reading metafile or chunk (hash=" + hash + ") from file")
-        fmt.Println(err)
+        //fmt.Println("ERROR: While reading metafile or chunk (hash=" + hash + ") from file")
+        //fmt.Println(err)
         return nil
     }
     return data
@@ -396,7 +396,9 @@ func (fs *FileSharing) sendDataRequest(dr *model.DataRequest) {
     gp := model.GossipPacket{DataRequest: dr}
     go fs.gossiper.sendGossipPacket(&gp, []string{destPeer})
 
-    go fs.waitDataReply(dr)
+    if dr.Origin == fs.gossiper.Name {
+        go fs.waitDataReply(dr)
+    }
 }
 
 func (fs *FileSharing) getChannelForHash(datahash string) chan bool {

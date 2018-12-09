@@ -468,7 +468,9 @@ func (g *Gossiper) AddPeer(peer string) {
 // Adds the node with name "origin" to the status and messages maps if not already present
 func (g *Gossiper) addNewNode(origin string) {
     _, isInStatusMap := g.status[origin]
+    g.messagesMutex.Lock()
     _, isInMessagesMap := g.messages[origin]
+    g.messagesMutex.Unlock()
 
     if !isInStatusMap || !isInMessagesMap {
         g.statusMutex.Lock()

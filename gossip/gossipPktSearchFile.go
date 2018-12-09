@@ -183,7 +183,7 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
         return make([]string, 0)
     }
     tmpPeers := g.peers
-    randomPeers := make([]string, int(n))
+    randomPeers := make([]string, 0)
 
     for i := 0; i < int(n); i++ {
         randomPeer := tmpPeers[rand.Intn(len(tmpPeers))]
@@ -199,7 +199,7 @@ func (g *Gossiper) getNRandomPeers(n uint64) []string {
 
 func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExpandingRing bool) {
     searchRequestUid := strings.Join(keywords, ",")
-    fmt.Printf("💡 SEARCH STARTED for keywords=" + searchRequestUid + " with budget=%d\n", budget)
+    fmt.Printf("SEARCH STARTED for keywords=" + searchRequestUid + " with budget=%d\n", budget)
 
     // Discard SearchRequest if it's a duplicate
     if g.checkDuplicateSearchRequests(g.Name, keywords) {
