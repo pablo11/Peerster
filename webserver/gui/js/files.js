@@ -109,9 +109,15 @@ function setupRequestFile() {
 function setupSearchFile() {
     $("#search-query-btn").click(function() {
         const searchQuery = $("#searchQuery").val()
+        const searchBudget = $("#searchBudget").val() || 0
+
+        if (searchQuery == "") {
+            return
+        }
 
         $.post("api/searchFiles", {
-            query: searchQuery
+            query: searchQuery,
+            budget: searchBudget
         }, function(data, status) {
             window.alert("The search process started, results will appear below.")
         })

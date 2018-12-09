@@ -206,7 +206,6 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
     }
 
     g.activeSearchRequestMutex.Lock()
-    defer g.activeSearchRequestMutex.Unlock()
 
     doLocalSearch := g.activeSearchRequest == nil
 
@@ -221,6 +220,8 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
         NotifyChannel: make(chan bool),
         Matches: make(map[string]*FileMatch),
     }
+
+    g.activeSearchRequestMutex.Unlock()
 
     if doLocalSearch {
         go g.searchFileLocally(keywords, g.Name)
@@ -238,6 +239,7 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
     select {
     case <-g.activeSearchRequest.NotifyChannel:
         // Match threshold reached, print
+        fmt.Println("✅ 2 MATHCHES")
         if startExpandingRing {
             ticker.Stop()
         }
@@ -245,7 +247,7 @@ func (g *Gossiper) StartSearchRequest(budget uint64, keywords []string, startExp
         g.activeSearchRequest = nil
         g.activeSearchRequestMutex.Unlock()
 
-        fmt.Println("✅ 2 MATHCHES")
+        fmt.Println("✅ 2 MATHCHES 1")
 
         // TODO: download the match files
 
@@ -309,17 +311,26 @@ func (g *Gossiper) HandlePktSearchReply(gp *model.GossipPacket) {
             g.activeSearchRequest.Matches[hexMetahash].ChunksLocation[int(chunkNb) - 1] = sr.Origin
         }
 
+        g.activeSearchRequestMutex.Unlock()
+
         // Check if it's a full match
         if len(g.activeSearchRequest.Matches[hexMetahash].ChunksLocation) == int(g.activeSearchRequest.Matches[hexMetahash].NbChunks) {
+            isDuplicate := false
             g.FullMatchesMutex.Lock()
-            g.FullMatches = append(g.FullMatches, g.activeSearchRequest.Matches[hexMetahash])
-            if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
-                fmt.Println("SEARCH FINISHED")
-                g.activeSearchRequest.NotifyChannel <- true
+            for _, fullMatch := range g.FullMatches {
+                if hex.EncodeToString(fullMatch.MetaHash) == hexMetahash {
+                    isDuplicate = true
+                }
+            }
+
+            if !isDuplicate {
+                g.FullMatches = append(g.FullMatches, g.activeSearchRequest.Matches[hexMetahash])
+                if len(g.FullMatches) >= SEARCH_REQUEST_MATCH_THRESHOLD {
+                    fmt.Println("SEARCH FINISHED")
+                    g.activeSearchRequest.NotifyChannel <- true
+                }
             }
             g.FullMatchesMutex.Unlock()
         }
-
-        g.activeSearchRequestMutex.Unlock()
     }
 }

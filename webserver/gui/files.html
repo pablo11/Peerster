@@ -78,17 +78,20 @@
         <!-- SEARCH FILES -->
         <div class="jumbotron">
             <h2 class="mt-0">Search files</h2>
-            <form id="search-file-form">
-                <div class="input-group">
-                    <input type="text" name="searchQuery" class="form-control" id="searchQuery" placeholder="*password*">
+            <div class="row" id="search-file-form">
+                <div class="col-sm-8">
+                    <input type="text" name="searchQuery" class="form-control" id="searchQuery" placeholder="keyword1,keyword2,...">
+                </div>
+                <div class="input-group col-sm-4">
+                    <input type="number" name="searchBudget" class="form-control" id="searchBudget" placeholder="Budget (Optional)">
                     <div class="input-group-btn">
                         <button class="btn btn-primary" type="submit" id="search-query-btn">Search</button>
                     </div>
                 </div>
-            </form>
+            </div>
 
             <div class="search-results">
-                <h2 class="mt-0">Results <small>Click to initiate download</small></h2>
+                <h2>Results <small>Click to initiate download</small></h2>
                 <div class="list-group mb-0" id="listSearchResults">
                 </div>
             </div>

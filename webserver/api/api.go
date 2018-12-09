@@ -7,6 +7,7 @@ import (
     "io/ioutil"
     "net/http"
     "strings"
+    "strconv"
     "encoding/base64"
     "encoding/hex"
     "github.com/pablo11/Peerster/gossip"
@@ -255,17 +256,27 @@ func (a *ApiHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 func (a *ApiHandler) SearchFiles(w http.ResponseWriter, r *http.Request) {
     // Get search query from request
     r.ParseForm()
-    query, ok := r.PostForm["query"]
-    if !ok || len(query) < 1 || query[0] == "" {
-        fmt.Println(query[0])
+    query, isQueryPresent := r.PostForm["query"]
+    budget, isBudgetPresent := r.PostForm["budget"]
+    if !isQueryPresent || len(query) < 1 || query[0] == "" || !isBudgetPresent || len(budget) < 1 {
         w.Header().Set("Server", "Cryptop GO server")
         w.WriteHeader(400)
         return
     }
 
     keywords := strings.Split(query[0], ",")
+    budgetVal, err := strconv.Atoi(budget[0])
+    if err != nil {
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
 
-    go a.gossiper.StartSearchRequest(2, keywords, false)
+    if budgetVal == 0 {
+        go a.gossiper.StartSearchRequest(2, keywords, true)
+    } else {
+        go a.gossiper.StartSearchRequest(uint64(budgetVal), keywords, false)
+    }
 
     // Respond to request with ok
     w.Header().Set("Server", "Cryptop GO server")
