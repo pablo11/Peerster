@@ -14,7 +14,7 @@ import (
 )
 
 const (
-    DEBUG bool = true
+    DEBUG bool = false
     PACKET_BUFFER_LEN int = 1024
     ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
     ANTI_ENTROPY_PERIOD time.Duration = 2

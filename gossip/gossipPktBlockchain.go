@@ -38,25 +38,45 @@ func (g *Gossiper) HandlePktTxPublish(gp *model.GossipPacket) {
     g.addTxPublishToPool(tp)
 
     // If HopLimit is > 1 decrement and broadcast
-    if tp.HopLimit > 1 {
-        tp.HopLimit -= 1
-        g.broadcastTxPublish(tp)
-    }
+    g.broadcastTxPublishDecrementingHopLimit(tp)
 }
 
 func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
     bp := gp.BlockPublish
 
-    // Do I have the parent block in the blockchain?
+    // Validate PoW
+    if !bp.Block.IsValid() {
+        fmt.Println("Discarding BlockPublish since the PoW is invalid")
+        return
+    }
+
+    // Check if I already have it in the blockchain
+
+
+    // Do I have the block in the blockchain or the parent block in the blockchain?
     parentInBlockchain := false
+    blockInBlockchain := false
     g.blockchainMutex.Lock()
-    for i := len(g.blockchain) - 1; i >= 0; i-- {
+    for i := len(g.blockchain) - 1; i >= 0 && !parentInBlockchain && !blockInBlockchain; i-- {
+        // Check if block is already in the blockchain
+        if bytes.Equal(g.blockchain[i].PrevHash[:], bp.Block.PrevHash[:]) {
+            blockInBlockchain = true
+        }
+
+        // Check if parent is in the blockchain
         blockHash := g.blockchain[i].Hash()
         if bytes.Equal(blockHash[:], bp.Block.PrevHash[:]) {
             parentInBlockchain = true
         }
     }
     g.blockchainMutex.Unlock()
+
+    if blockInBlockchain {
+        // Forward the blockPublish since someone could not have it
+        g.broadcastBlockPublishDecrementingHopLimit(bp)
+        fmt.Println("Discarding BlockPublish since block is already in the blockchain")
+        return
+    }
 
     isGenesisBlock := false
     if !parentInBlockchain {
@@ -76,12 +96,6 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
-    // Validate PoW
-    if !bp.Block.IsValid() {
-        fmt.Println("Discarding BlockPublish since the PoW is invalid")
-        return
-    }
-
     // Append block to blockchain
     g.blockchainMutex.Lock()
     g.blockchain = append(g.blockchain, &bp.Block)
@@ -97,13 +111,14 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
     g.filesNameMutex.Unlock()
 
     // If HopLimit is > 1 decrement and broadcast
-    if bp.HopLimit > 1 {
-        bp.HopLimit -= 1
-        g.broadcastBlockPublish(bp)
-    }
+    g.broadcastBlockPublishDecrementingHopLimit(bp)
 }
 
 func (g *Gossiper) printBlockchain() {
+
+    // TODO: store a variable containing the string, add a new block to string when it's added to the blockchain
+    // this results in less  calculations of the hash of blocks
+
     chainStr := ""
     for i := len(g.blockchain) - 1; i >= 0; i-- {
         chainStr += " " + g.blockchain[i].String()
@@ -117,9 +132,25 @@ func (g *Gossiper) broadcastTxPublish(tp *model.TxPublish) {
     go g.sendGossipPacket(&gp, g.peers)
 }
 
+func (g *Gossiper) broadcastTxPublishDecrementingHopLimit(tp *model.TxPublish) {
+    // If HopLimit is > 1 decrement and broadcast
+    if tp.HopLimit > 1 {
+        tp.HopLimit -= 1
+        g.broadcastTxPublish(tp)
+    }
+}
+
 func (g *Gossiper) broadcastBlockPublish(bp *model.BlockPublish) {
     gp := model.GossipPacket{BlockPublish: bp}
     go g.sendGossipPacket(&gp, g.peers)
+}
+
+func (g *Gossiper) broadcastBlockPublishDecrementingHopLimit(bp *model.BlockPublish) {
+    // If HopLimit is > 1 decrement and broadcast
+    if bp.HopLimit > 1 {
+        bp.HopLimit -= 1
+        g.broadcastBlockPublish(bp)
+    }
 }
 
 func (g *Gossiper) SendTxPublish(file *model.File) {
@@ -189,18 +220,18 @@ func (g *Gossiper) startMining() {
             g.filesForNextBlock = g.filesForNextBlock[len(transactions):len(g.filesForNextBlock)]
             g.filesForNextBlockMutex.Unlock()
 
-            g.broadcastBlockPublish(&model.BlockPublish{
-                Block: block,
-                HopLimit: 20,
-            })
-
             // Add block to blockchain
             g.blockchainMutex.Lock()
             g.blockchain = append(g.blockchain, &block)
             g.blockchainMutex.Unlock()
+
+            g.broadcastBlockPublish(&model.BlockPublish{
+                Block: block,
+                HopLimit: 20,
+            })
         } else {
             // Wait a bit before checking again
-            time.Sleep(500 * time.Millisecond)
+            time.Sleep(1 * time.Second)
         }
     }
 
