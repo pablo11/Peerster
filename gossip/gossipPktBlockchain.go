@@ -3,7 +3,7 @@ package gossip
 import (
     "fmt"
     "bytes"
-    //"encoding/hex"
+    "encoding/hex"
     "time"
     "github.com/pablo11/Peerster/model"
 )
@@ -114,15 +114,111 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
     g.broadcastBlockPublishDecrementingHopLimit(bp)
 }
 
-func (g *Gossiper) printBlockchain() {
+func (g *Gossiper) HandlePktBlockPublish2(gp *model.GossipPacket) {
+    bp := gp.BlockPublish
 
-    // TODO: store a variable containing the string, add a new block to string when it's added to the blockchain
-    // this results in less  calculations of the hash of blocks
-
-    chainStr := ""
-    for i := len(g.blockchain) - 1; i >= 0; i-- {
-        chainStr += " " + g.blockchain[i].String()
+    // Validate PoW
+    if !bp.Block.IsValid() {
+        fmt.Println("Discarding BlockPublish since the PoW is invalid")
+        return
     }
+
+    blockHash := bp.Block.Hash
+    blockHashStr := hex.EncodeToString(blockHash)
+
+    // Check if we already have the block
+    g.blocksMutex.Lock()
+    _, isPresent := g.blocks[blockHashStr]
+    g.blocksMutex.Unlock()
+    if isPresent {
+        // Forward the blockPublish since someone could not have it
+        g.broadcastBlockPublishDecrementingHopLimit(bp)
+        fmt.Println("Discarding BlockPublish since block is already in the blockchain")
+        return
+    }
+
+    // Store block
+    g.blocksMutex.Lock()
+    g.blocks[blockHashStr] = bp
+    g.blocksMutex.Unlock()
+
+    // Check if this block is the continuation of a fork
+    isNewFork := true
+    g.forksMutex.Lock()
+    for lastHash, blockchainLength := range g.forks {
+        if lastHash == hex.EncodeToString(bp.Block.PrevHash) {
+            delete(g.forks, lastHash)
+            g.forks[blockHashStr] = blockchainLength + 1
+            isNewFork = false
+            break
+        }
+    }
+    g.forksMutex.Unlock()
+
+    if isNewFork {
+        // Count length of blockchain
+        blockchainLength := g.forkLength(blockHashStr)
+
+        g.forksMutex.Lock()
+        g.forks[blockHashStr] = blockchainLength + 1
+        g.forksMutex.Unlock()
+    }
+
+    g.printBlockchain(blockHashStr)
+
+
+
+
+    // TODO: FORK-LONGER rewind %d blocks -- FORK-SHORTER [hash]
+    // TODO: switch longestChain variable
+
+
+
+
+
+    // Integrate transactions in the filesName mapping
+    g.filesNameMutex.Lock()
+    for _, trx := range bp.Block.Transactions {
+        g.filesName[trx.File.Name] = &trx.File
+    }
+    g.filesNameMutex.Unlock()
+
+    // If HopLimit is > 1 decrement and broadcast
+    g.broadcastBlockPublishDecrementingHopLimit(bp)
+}
+
+func (g *Gossiper) forkLength(blockHash string) uint64 {
+    currentHash := blockHash
+    var length uint64 = 0
+    g.blocksMutex.Lock()
+
+    for {
+        block, isPresent := g.blocks[currentHash]
+        if !isPresent {
+            break
+        }
+
+        length += 1
+        currentHash = hex.EncodeToString(block.PrevHash)
+    }
+
+    g.blocksMutex.Unlock()
+    return length
+}
+
+func (g *Gossiper) printBlockchain(headHash string) {
+    currentHash := headHash
+    chainStr := ""
+    g.blocksMutex.Lock()
+    for {
+        block, isPresent := g.blocks[currentHash]
+        if !isPresent {
+            break
+        }
+
+        chainStr += " " + block.String()
+    }
+    g.blocksMutex.Unlock()
 
     fmt.Println("CHAIN" + chainStr)
 }

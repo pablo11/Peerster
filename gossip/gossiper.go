@@ -74,6 +74,20 @@ type Gossiper struct {
 
     filesForNextBlock []*model.TxPublish
     filesForNextBlockMutex sync.Mutex
+
+
+/*
+    blockchainForks [][]*model.Block
+    blockchainForksMutex sync.Mutex
+*/
+    blocks map(string)*model.Block
+    blocksMutex sync.Mutex
+
+    // Store the hash of the last block of each fork with the respective blockchain length
+    forks map(string)int
+    forksMutex sync.Mutex
+
+    lognestChain string
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -115,6 +129,17 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         filesNameMutex: sync.Mutex{},
         filesForNextBlock: make([]*model.TxPublish, 0),
         filesForNextBlockMutex: sync.Mutex{},
+/*
+        blockchainForks: make([][]*model.Block, 0),
+        blockchainForksMutex: sync.Mutex{},
+*/
+        blocks: make(map[string]*model.Block),
+        blocksMutex: sync.Mutex{},
+
+        forks: make(map[string]uint64),
+        forksMutex: sync.Mutex{},
+
+        lognestChain: "",
     }
 }
 
