@@ -34,7 +34,7 @@ func (b *Block) Hash() (out [32]byte) {
     return
 }
 
-func (b *Block) Mine() [32]byte {
+func (b *Block) Mine() {
     var nonce [32]byte
     for {
         rand.Read(nonce[:])
@@ -42,7 +42,7 @@ func (b *Block) Mine() [32]byte {
         if b.IsValid() {
             hash := b.Hash()
             fmt.Println("FOUND-BLOCK " + hex.EncodeToString(hash[:]))
-            return hash
+            return
         }
     }
 }

@@ -50,81 +50,8 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
-    // Check if I already have it in the blockchain
-
-
-    // Do I have the block in the blockchain or the parent block in the blockchain?
-    parentInBlockchain := false
-    blockInBlockchain := false
-    g.blockchainMutex.Lock()
-    for i := len(g.blockchain) - 1; i >= 0 && !parentInBlockchain && !blockInBlockchain; i-- {
-        // Check if block is already in the blockchain
-        if bytes.Equal(g.blockchain[i].PrevHash[:], bp.Block.PrevHash[:]) {
-            blockInBlockchain = true
-        }
-
-        // Check if parent is in the blockchain
-        blockHash := g.blockchain[i].Hash()
-        if bytes.Equal(blockHash[:], bp.Block.PrevHash[:]) {
-            parentInBlockchain = true
-        }
-    }
-    g.blockchainMutex.Unlock()
-
-    if blockInBlockchain {
-        // Forward the blockPublish since someone could not have it
-        g.broadcastBlockPublishDecrementingHopLimit(bp)
-        fmt.Println("Discarding BlockPublish since block is already in the blockchain")
-        return
-    }
-
-    isGenesisBlock := false
-    if !parentInBlockchain {
-        // Check if it's the genesis block
-        isGenesisBlock = bytes.Equal(bp.Block.PrevHash[:], make([]byte, 32))
-
-        /*
-        isGenesisBlock = true
-        for _, b := range bp.Block.PrevHash {
-            isGenesisBlock = isGenesisBlock && b == byte(0)
-        }
-        */
-    }
-
-    if !parentInBlockchain && !isGenesisBlock {
-        fmt.Println("Discarding BlockPublish since parent block isn't in the blockchain")
-        return
-    }
-
-    // Append block to blockchain
-    g.blockchainMutex.Lock()
-    g.blockchain = append(g.blockchain, &bp.Block)
-    g.blockchainMutex.Unlock()
-
-    g.printBlockchain()
-
-    // Integrate transactions in the filesName mapping
-    g.filesNameMutex.Lock()
-    for _, trx := range bp.Block.Transactions {
-        g.filesName[trx.File.Name] = &trx.File
-    }
-    g.filesNameMutex.Unlock()
-
-    // If HopLimit is > 1 decrement and broadcast
-    g.broadcastBlockPublishDecrementingHopLimit(bp)
-}
-
-func (g *Gossiper) HandlePktBlockPublish2(gp *model.GossipPacket) {
-    bp := gp.BlockPublish
-
-    // Validate PoW
-    if !bp.Block.IsValid() {
-        fmt.Println("Discarding BlockPublish since the PoW is invalid")
-        return
-    }
-
-    blockHash := bp.Block.Hash
-    blockHashStr := hex.EncodeToString(blockHash)
+    blockHash := bp.Block.Hash()
+    blockHashStr := hex.EncodeToString(blockHash[:])
 
     // Check if we already have the block
     g.blocksMutex.Lock()
@@ -139,17 +66,29 @@ func (g *Gossiper) HandlePktBlockPublish2(gp *model.GossipPacket) {
 
     // Store block
     g.blocksMutex.Lock()
-    g.blocks[blockHashStr] = bp
+    g.blocks[blockHashStr] = &bp.Block
     g.blocksMutex.Unlock()
 
     // Check if this block is the continuation of a fork
     isNewFork := true
     g.forksMutex.Lock()
     for lastHash, blockchainLength := range g.forks {
-        if lastHash == hex.EncodeToString(bp.Block.PrevHash) {
+        if lastHash == hex.EncodeToString(bp.Block.PrevHash[:]) {
             delete(g.forks, lastHash)
             g.forks[blockHashStr] = blockchainLength + 1
             isNewFork = false
+
+            // Check if we modified the longest chain
+            if g.longestChain == lastHash {
+                g.updateLongestChain(blockHashStr)
+            } else {
+                // Check if this fork becomes the longest chain
+                if blockchainLength + 1 > g.forks[g.longestChain] {
+                    // We are switching to a new longest chain
+                    fmt.Printf("FORK-LONGER rewind %d blocks\n", g.computeNbBlocksRewind(blockHashStr, g.longestChain))
+                    g.updateLongestChain(blockHashStr)
+                }
+            }
             break
         }
     }
@@ -160,21 +99,16 @@ func (g *Gossiper) HandlePktBlockPublish2(gp *model.GossipPacket) {
         blockchainLength := g.forkLength(blockHashStr)
 
         g.forksMutex.Lock()
-        g.forks[blockHashStr] = blockchainLength + 1
+        g.forks[blockHashStr] = uint64(blockchainLength + 1)
         g.forksMutex.Unlock()
+
+        if bytes.Equal(bp.Block.PrevHash[:], make([]byte, 32)) {
+            // It's the genesis block
+            g.updateLongestChain(blockHashStr)
+        } else {
+            fmt.Println("FORK-SHORTER " + hex.EncodeToString(bp.Block.PrevHash[:]))
+        }
     }
-
-    g.printBlockchain(blockHashStr)
-
-
-
-
-    // TODO: FORK-LONGER rewind %d blocks -- FORK-SHORTER [hash]
-    // TODO: switch longestChain variable
-
-
-
-
 
     // Integrate transactions in the filesName mapping
     g.filesNameMutex.Lock()
@@ -185,6 +119,11 @@ func (g *Gossiper) HandlePktBlockPublish2(gp *model.GossipPacket) {
 
     // If HopLimit is > 1 decrement and broadcast
     g.broadcastBlockPublishDecrementingHopLimit(bp)
+}
+
+func (g *Gossiper) updateLongestChain(blockHashStr string) {
+    g.longestChain = blockHashStr
+    g.printBlockchain(blockHashStr)
 }
 
 func (g *Gossiper) forkLength(blockHash string) uint64 {
@@ -199,11 +138,32 @@ func (g *Gossiper) forkLength(blockHash string) uint64 {
         }
 
         length += 1
-        currentHash = hex.EncodeToString(block.PrevHash)
+        currentHash = hex.EncodeToString(block.PrevHash[:])
     }
 
     g.blocksMutex.Unlock()
     return length
+}
+
+func (g *Gossiper) computeNbBlocksRewind(newHeadHash, oldHeadHash string) int {
+    rewind := 0
+
+    newHeadHashCurrent := newHeadHash
+    oldHeadHashCurrent := oldHeadHash
+
+    for {
+        new, _ := g.blocks[newHeadHashCurrent]
+        old, isNotGenesis := g.blocks[oldHeadHashCurrent]
+        oldHash := old.Hash()
+        if !isNotGenesis || bytes.Equal(oldHash[:], new.PrevHash[:]) {
+            break
+        }
+        rewind += 1
+
+        newHeadHashCurrent = hex.EncodeToString(new.PrevHash[:])
+        oldHeadHashCurrent = hex.EncodeToString(old.PrevHash[:])
+    }
+    return rewind
 }
 
 func (g *Gossiper) printBlockchain(headHash string) {
@@ -288,12 +248,16 @@ func (g *Gossiper) startMining() {
         if len(g.filesForNextBlock) > 0 {
 
             // Create the block from filesForNextBlock
-            g.blockchainMutex.Lock()
             var prevHash [32]byte = [32]byte{} //zeroBytes[0:32]
-            if len(g.blockchain) > 0 {
-                prevHash = g.blockchain[len(g.blockchain) - 1].Hash()
+            g.forksMutex.Lock()
+            longestChainLength := g.forks[g.longestChain]
+            g.forksMutex.Unlock()
+            if longestChainLength > 0 {
+                g.blocksMutex.Lock()
+                prevHash = g.blocks[g.longestChain].PrevHash
+                g.blocksMutex.Unlock()
             }
-            g.blockchainMutex.Unlock()
+
 
             g.filesForNextBlockMutex.Lock()
             transactions := make([]model.TxPublish, len(g.filesForNextBlock))
@@ -309,22 +273,21 @@ func (g *Gossiper) startMining() {
             }
 
             // Mine block
-            _ = block.Mine()
+            block.Mine()
 
             // Remove transactions mined from the filesForNextBlock (assume that there are no new TxPhublish added in the middle of the list)
             g.filesForNextBlockMutex.Lock()
             g.filesForNextBlock = g.filesForNextBlock[len(transactions):len(g.filesForNextBlock)]
             g.filesForNextBlockMutex.Unlock()
 
-            // Add block to blockchain
-            g.blockchainMutex.Lock()
-            g.blockchain = append(g.blockchain, &block)
-            g.blockchainMutex.Unlock()
-
-            g.broadcastBlockPublish(&model.BlockPublish{
+            bp := &model.BlockPublish{
                 Block: block,
                 HopLimit: 20,
-            })
+            }
+
+            g.HandlePktBlockPublish(&model.GossipPacket{BlockPublish: bp})
+
+            g.broadcastBlockPublish(bp)
         } else {
             // Wait a bit before checking again
             time.Sleep(1 * time.Second)

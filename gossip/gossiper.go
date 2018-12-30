@@ -80,14 +80,14 @@ type Gossiper struct {
     blockchainForks [][]*model.Block
     blockchainForksMutex sync.Mutex
 */
-    blocks map(string)*model.Block
+    blocks map[string]*model.Block
     blocksMutex sync.Mutex
 
     // Store the hash of the last block of each fork with the respective blockchain length
-    forks map(string)int
+    forks map[string]uint64
     forksMutex sync.Mutex
 
-    lognestChain string
+    longestChain string
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -139,7 +139,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         forks: make(map[string]uint64),
         forksMutex: sync.Mutex{},
 
-        lognestChain: "",
+        longestChain: "",
     }
 }
 
