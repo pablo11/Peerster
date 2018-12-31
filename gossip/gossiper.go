@@ -14,7 +14,7 @@ import (
 )
 
 const (
-    DEBUG bool = false
+    DEBUG bool = true
     PACKET_BUFFER_LEN int = 1024
     ACK_STATUS_WAIT_TIME time.Duration = 1 // Number of seconds to wait for a reply to a status message
     ANTI_ENTROPY_PERIOD time.Duration = 2
@@ -81,7 +81,7 @@ type Gossiper struct {
     blockchainForksMutex sync.Mutex
 */
     blocks map[string]*model.Block
-    blocksMutex sync.Mutex
+    blocksMutex sync.RWMutex
 
     // Store the hash of the last block of each fork with the respective blockchain length
     forks map[string]uint64
@@ -134,7 +134,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         blockchainForksMutex: sync.Mutex{},
 */
         blocks: make(map[string]*model.Block),
-        blocksMutex: sync.Mutex{},
+        blocksMutex: sync.RWMutex{},
 
         forks: make(map[string]uint64),
         forksMutex: sync.Mutex{},

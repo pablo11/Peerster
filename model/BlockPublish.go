@@ -10,6 +10,8 @@ import (
     "strings"
 )
 
+const MINING_DIFFICULTY int = 3
+
 type BlockPublish struct {
     Block Block
     HopLimit uint32
@@ -19,6 +21,10 @@ type Block struct {
     PrevHash [32]byte
     Nonce [32]byte
     Transactions []TxPublish
+}
+
+func (b *Block) PrevHashStr() string {
+    return hex.EncodeToString(b.PrevHash[:])
 }
 
 func (b *Block) Hash() (out [32]byte) {
@@ -49,7 +55,7 @@ func (b *Block) Mine() {
 
 func (b *Block) IsValid() bool {
     blockHash := b.Hash()
-    return bytes.Equal(blockHash[0:2], []byte{0, 0})
+    return bytes.Equal(blockHash[0:MINING_DIFFICULTY], make([]byte, MINING_DIFFICULTY))
 }
 
 func (b *Block) String() string {

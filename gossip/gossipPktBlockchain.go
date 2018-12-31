@@ -6,6 +6,7 @@ import (
     "encoding/hex"
     "time"
     "github.com/pablo11/Peerster/model"
+    "github.com/pablo11/Peerster/util/debug"
 )
 
 
@@ -122,6 +123,7 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
 }
 
 func (g *Gossiper) updateLongestChain(blockHashStr string) {
+    debug.Debug("UPDATING LONGEST CHAIN TO " + blockHashStr)
     g.longestChain = blockHashStr
     g.printBlockchain(blockHashStr)
 }
@@ -152,16 +154,18 @@ func (g *Gossiper) computeNbBlocksRewind(newHeadHash, oldHeadHash string) int {
     oldHeadHashCurrent := oldHeadHash
 
     for {
+        g.blocksMutex.Lock()
         new, _ := g.blocks[newHeadHashCurrent]
         old, isNotGenesis := g.blocks[oldHeadHashCurrent]
+        g.blocksMutex.Unlock()
         oldHash := old.Hash()
         if !isNotGenesis || bytes.Equal(oldHash[:], new.PrevHash[:]) {
             break
         }
         rewind += 1
 
-        newHeadHashCurrent = hex.EncodeToString(new.PrevHash[:])
-        oldHeadHashCurrent = hex.EncodeToString(old.PrevHash[:])
+        newHeadHashCurrent = new.PrevHashStr()
+        oldHeadHashCurrent = old.PrevHashStr()
     }
     return rewind
 }
@@ -169,7 +173,8 @@ func (g *Gossiper) computeNbBlocksRewind(newHeadHash, oldHeadHash string) int {
 func (g *Gossiper) printBlockchain(headHash string) {
     currentHash := headHash
     chainStr := ""
-    g.blocksMutex.Lock()
+
+    g.blocksMutex.RLock()
     for {
         block, isPresent := g.blocks[currentHash]
         if !isPresent {
@@ -177,8 +182,9 @@ func (g *Gossiper) printBlockchain(headHash string) {
         }
 
         chainStr += " " + block.String()
+        currentHash = block.PrevHashStr()
     }
-    g.blocksMutex.Unlock()
+    g.blocksMutex.RUnlock()
 
     fmt.Println("CHAIN" + chainStr)
 }
@@ -240,12 +246,12 @@ func (g *Gossiper) addTxPublishToPool(tp *model.TxPublish) {
 func (g *Gossiper) startMining() {
     time.Sleep(GENESIS_BLOCK_WAIT_TIME * time.Second)
 
-    fmt.Println("START MINING " + time.Now().String())
-
     var zeroBytes [32]byte = [32]byte{}
 
     for {
         if len(g.filesForNextBlock) > 0 {
+
+            debug.Debug("START MINING " + time.Now().String())
 
             // Create the block from filesForNextBlock
             var prevHash [32]byte = [32]byte{} //zeroBytes[0:32]
@@ -253,9 +259,9 @@ func (g *Gossiper) startMining() {
             longestChainLength := g.forks[g.longestChain]
             g.forksMutex.Unlock()
             if longestChainLength > 0 {
-                g.blocksMutex.Lock()
+                g.blocksMutex.RLock()
                 prevHash = g.blocks[g.longestChain].PrevHash
-                g.blocksMutex.Unlock()
+                g.blocksMutex.RUnlock()
             }
 
 
