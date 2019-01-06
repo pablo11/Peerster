@@ -5,13 +5,11 @@ import (
     "encoding/binary"
     "crypto/sha256"
     "math/rand"
-    //"bytes"
     "encoding/hex"
     "strings"
-    //"github.com/pablo11/Peerster/util/debug"
 )
 
-const MINING_DIFFICULTY int = 5 // Each unit of mining difficulty corresponds to 4 bits
+const MINING_DIFFICULTY int = 6 // Each unit of mining difficulty corresponds to 4 bits
 
 type BlockPublish struct {
     Block Block
@@ -63,7 +61,6 @@ func (b *Block) IsValid() bool {
     blockHash := b.Hash()
     blockHashStr := hex.EncodeToString(blockHash[:])
     return blockHashStr[0:MINING_DIFFICULTY] == strings.Repeat("0", MINING_DIFFICULTY)
-    //return bytes.Equal(blockHash[0:MINING_DIFFICULTY], make([]byte, MINING_DIFFICULTY))
 }
 
 func (b *Block) String() string {
@@ -71,7 +68,5 @@ func (b *Block) String() string {
     for i, trx := range b.Transactions {
         filenames[i] = trx.File.Name
     }
-    blockHash := b.Hash()
-    //debug.Debug("🍎 PRINTING BLOCKCHAIN BLOCK HASH " + hex.EncodeToString(blockHash[:]))
-    return hex.EncodeToString(blockHash[:]) + ":" + b.PrevHashStr() + ":" + strings.Join(filenames, ",")
+    return b.HashStr() + ":" + b.PrevHashStr() + ":" + strings.Join(filenames, ",")
 }

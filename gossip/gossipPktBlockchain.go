@@ -2,16 +2,13 @@ package gossip
 
 import (
     "fmt"
-    "bytes"
-    "encoding/hex"
     "time"
-    "strconv"
+    "bytes"
     "math/rand"
+    "encoding/hex"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/debug"
 )
-
-
 
 func (g *Gossiper) HandlePktTxPublish(gp *model.GossipPacket) {
     tp := gp.TxPublish
@@ -67,19 +64,19 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
-    fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
+    //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
 
     // Store block
+    newBlock := g.deepCopyBlock(bp.Block)
+
     g.blocksMutex.Lock()
-    g.blocks[blockHashStr] = &bp.Block
+    g.blocks[blockHashStr] = &newBlock
     g.blocksMutex.Unlock()
 
     // Check if this block is the continuation of a fork
     isNewFork := true
     g.forksMutex.Lock()
     for lastHash, blockchainLength := range g.forks {
-        fmt.Println("FORK LAST BLOCK HASH: " + lastHash + " WITH LENGTH " + strconv.Itoa(int(blockchainLength)))
-
         if lastHash == bp.Block.PrevHashStr() {
             delete(g.forks, lastHash)
             g.forks[blockHashStr] = blockchainLength + 1
@@ -130,9 +127,34 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
     g.broadcastBlockPublishDecrementingHopLimit(bp)
 }
 
-func (g *Gossiper) updateLongestChain(blockHashStr string, block *model.Block) {
-    debug.Debug("UPDATING LONGEST CHAIN TO " + blockHashStr + " WITH LENGTH " + strconv.Itoa(int(g.forkLength(blockHashStr))))
+func (g *Gossiper) deepCopyBlock(b model.Block) model.Block {
+    var newPrevHash [32]byte
+    var newNonce [32]byte
+    copy(newPrevHash[:], b.PrevHash[:])
+    copy(newNonce[:], b.Nonce[:])
 
+    var newTransactions []model.TxPublish = make([]model.TxPublish, len(b.Transactions))
+    for i, tx := range b.Transactions {
+        var metafileHashCopy []byte = make([]byte, 32)
+        copy(metafileHashCopy[:], tx.File.MetafileHash[:])
+        newTransactions[i] = model.TxPublish{
+            File: model.File{
+                Name: tx.File.Name,
+                Size: tx.File.Size,
+                MetafileHash: metafileHashCopy,
+            },
+            HopLimit: tx.HopLimit,
+        }
+    }
+
+    return model.Block{
+        PrevHash: newPrevHash,
+        Nonce: newNonce,
+        Transactions: newTransactions,
+    }
+}
+
+func (g *Gossiper) updateLongestChain(blockHashStr string, block *model.Block) {
     g.longestChain = blockHashStr
 
     // Remove transactions from pool of transactions for next block to mine
@@ -347,7 +369,7 @@ func (g *Gossiper) createBlockAndMine() *model.Block {
         }
 
         if block.IsValid() {
-            fmt.Println("✅ FOUND-BLOCK " + block.HashStr())
+            fmt.Println("FOUND-BLOCK " + block.HashStr())
 
             // Remove transactions mined from the txsForNextBlock (assume that there are no new TxPhublish added in the middle of the list)
             g.txsForNextBlockMutex.Lock()
