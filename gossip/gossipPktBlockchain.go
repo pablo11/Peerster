@@ -38,7 +38,7 @@ func (g *Gossiper) HandlePktTxPublish(gp *model.GossipPacket) {
     g.filesNameMutex.Unlock()
 
     // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-    g.addTxPublishToPool(tp)
+    g.addTxPublishToPool(*tp)
 
     // If HopLimit is > 1 decrement and broadcast
     g.broadcastTxPublishDecrementingHopLimit(tp)
@@ -67,7 +67,7 @@ func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
-    fmt.Printf("🧩 NEW BLOCK %+v\n", bp)
+    fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
 
     // Store block
     g.blocksMutex.Lock()
@@ -251,12 +251,12 @@ func (g *Gossiper) SendTxPublish(file *model.File) {
     }
 
     // Add the transaction to the pool of transactions to be added in the next block
-    g.addTxPublishToPool(&tp)
+    g.addTxPublishToPool(tp)
 
     g.broadcastTxPublish(&tp)
 }
 
-func (g *Gossiper) addTxPublishToPool(tp *model.TxPublish) {
+func (g *Gossiper) addTxPublishToPool(tp model.TxPublish) {
     // Add only if not already there
     g.txsForNextBlockMutex.Lock()
     alreadyPresnet := false
@@ -267,7 +267,18 @@ func (g *Gossiper) addTxPublishToPool(tp *model.TxPublish) {
     }
 
     if !alreadyPresnet {
-        g.txsForNextBlock = append(g.txsForNextBlock, *tp)
+        var metafileHashCopy []byte = make([]byte, 32)
+        copy(metafileHashCopy[:], tp.File.MetafileHash[:])
+        tx := model.TxPublish{
+            File: model.File{
+                Name: tp.File.Name,
+                Size: tp.File.Size,
+                MetafileHash: metafileHashCopy,
+            },
+            HopLimit: tp.HopLimit,
+        }
+
+        g.txsForNextBlock = append(g.txsForNextBlock, tx)
     }
 
     g.txsForNextBlockMutex.Unlock()
