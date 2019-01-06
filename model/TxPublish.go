@@ -3,6 +3,7 @@ package model
 import (
     "encoding/binary"
     "crypto/sha256"
+    "encoding/hex"
 )
 
 type TxPublish struct {
@@ -17,4 +18,9 @@ func (t *TxPublish) Hash() (out [32]byte) {
     h.Write(t.File.MetafileHash)
     copy(out[:], h.Sum(nil))
     return
+}
+
+func (t *TxPublish) HashStr() string {
+    hash := t.Hash()
+    return hex.EncodeToString(hash[:])
 }

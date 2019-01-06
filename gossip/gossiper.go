@@ -72,8 +72,8 @@ type Gossiper struct {
     filesName map[string]*model.File
     filesNameMutex sync.Mutex
 
-    filesForNextBlock []*model.TxPublish
-    filesForNextBlockMutex sync.Mutex
+    txsForNextBlock []model.TxPublish
+    txsForNextBlockMutex sync.Mutex
 
 
 /*
@@ -127,8 +127,8 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         blockchainMutex: sync.Mutex{},
         filesName: make(map[string]*model.File),
         filesNameMutex: sync.Mutex{},
-        filesForNextBlock: make([]*model.TxPublish, 0),
-        filesForNextBlockMutex: sync.Mutex{},
+        txsForNextBlock: make([]model.TxPublish, 0),
+        txsForNextBlockMutex: sync.Mutex{},
 /*
         blockchainForks: make([][]*model.Block, 0),
         blockchainForksMutex: sync.Mutex{},
