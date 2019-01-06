@@ -315,7 +315,7 @@ func (g *Gossiper) startMining() {
         g.txsForNextBlockMutex.Unlock()
 
         if txsForNextBlockLength > 0 {
-            debug.Debug("START MINING " + time.Now().String())
+            //debug.Debug("START MINING " + time.Now().String())
 
             block := g.createBlockAndMine()
             if block != nil {
