@@ -2,7 +2,10 @@
 
 This is a project for the course "Decentralized Systems Engineering" (CS438) at EPFL, Fall 2018.
 
-Author: Pablo Pfister <pablo.pfister@epfl.ch>
+#### Authors:  
+Pablo Pfister <pablo.pfister@epfl.ch>  
+Riccardo Conti <riccardo.conti@epfl.ch>  
+Raphael Madillo <raphael.madillo@epfl.ch>
 
 ---
 
@@ -33,6 +36,7 @@ Each node in Peerster acts as a ​gossiper​, as depicted above, but also ​e
 #### Homework 3:
 - File search by keywords
 - GUI allowing file search, file download
+- Blockchain with mining and fork handling to guarantee unique filenames
 
 ---
 ## Run it
