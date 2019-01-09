@@ -124,7 +124,7 @@ func (fs *FileSharing) IndexFile(path string) {
     }
 
     // Publish file for blockchain
-    go fs.gossiper.SendTxPublish(&model.File{
+    go fs.gossiper.Blockchain.SendFileTx(&model.File{
         Name: path,
         Size: filesize,
         MetafileHash: metaHash,

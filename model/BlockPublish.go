@@ -7,6 +7,7 @@ import (
     "math/rand"
     "encoding/hex"
     "strings"
+    "bytes"
 )
 
 const MINING_DIFFICULTY int = 6 // Each unit of mining difficulty corresponds to 4 bits
@@ -19,7 +20,7 @@ type BlockPublish struct {
 type Block struct {
     PrevHash [32]byte
     Nonce [32]byte
-    Transactions []TxPublish
+    Transactions []Transaction
 }
 
 func (b *Block) HashStr() string {
@@ -63,10 +64,34 @@ func (b *Block) IsValid() bool {
     return blockHashStr[0:MINING_DIFFICULTY] == strings.Repeat("0", MINING_DIFFICULTY)
 }
 
+func (b *Block) Copy() Block {
+    var prevHashCopy [32]byte// = make([]byte, 32)
+    copy(prevHashCopy[:], b.PrevHash[:])
+    var nonceCopy [32]byte// = make([]byte, 32)
+    copy(nonceCopy[:], b.Nonce[:])
+
+    transactionsCopy := make([]Transaction, len(b.Transactions))
+    for idx, tx := range b.Transactions {
+        transactionsCopy[idx] = tx.Copy()
+    }
+
+    return Block{
+        PrevHash: prevHashCopy,
+        Nonce: nonceCopy,
+        Transactions: transactionsCopy,
+    }
+}
+
+func (b *Block) IsGenesis() bool {
+    return bytes.Equal(b.PrevHash[:], make([]byte, 32))
+}
+
 func (b *Block) String() string {
+    /*
     filenames := make([]string, len(b.Transactions))
     for i, trx := range b.Transactions {
         filenames[i] = trx.File.Name
     }
-    return b.HashStr() + ":" + b.PrevHashStr() + ":" + strings.Join(filenames, ",")
+    */
+    return b.HashStr() + ":" + b.PrevHashStr() + ":transactions" // + strings.Join(filenames, ",")
 }

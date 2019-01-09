@@ -65,6 +65,9 @@ type Gossiper struct {
     FullMatches []*model.FileMatch
     FullMatchesMutex sync.Mutex
 
+    Blockchain *Blockchain
+
+/*
     blockchain []*model.Block
     blockchainMutex sync.Mutex
 
@@ -75,11 +78,9 @@ type Gossiper struct {
     txsForNextBlock []model.TxPublish
     txsForNextBlockMutex sync.Mutex
 
+    txsPool []model.Transaction
+    txsPoolMutex sync.Mutex
 
-/*
-    blockchainForks [][]*model.Block
-    blockchainForksMutex sync.Mutex
-*/
     blocks map[string]*model.Block
     blocksMutex sync.RWMutex
 
@@ -88,6 +89,7 @@ type Gossiper struct {
     forksMutex sync.Mutex
 
     longestChain string
+    */
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -123,16 +125,20 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         FullMatches: make([]*model.FileMatch, 0),
         FullMatchesMutex: sync.Mutex{},
 
+        Blockchain: NewBlockchain(),
+
+// Can be removed
+/*
         blockchain: make([]*model.Block, 0),
         blockchainMutex: sync.Mutex{},
         filesName: make(map[string]*model.File),
         filesNameMutex: sync.Mutex{},
         txsForNextBlock: make([]model.TxPublish, 0),
         txsForNextBlockMutex: sync.Mutex{},
-/*
-        blockchainForks: make([][]*model.Block, 0),
-        blockchainForksMutex: sync.Mutex{},
-*/
+
+        txsPool: make([]model.Transaction, 0),
+        txsPoolMutex: sync.Mutex{},
+
         blocks: make(map[string]*model.Block),
         blocksMutex: sync.RWMutex{},
 
@@ -140,6 +146,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         forksMutex: sync.Mutex{},
 
         longestChain: "",
+        */
     }
 }
 
@@ -148,6 +155,7 @@ func (g *Gossiper) Run(uiPort string) {
     fmt.Println()
 
     g.FileSharing.SetGossiper(g)
+    g.Blockchain.SetGossiper(g)
 
     go g.listenPeers()
     go g.listenClient(uiPort)
@@ -156,7 +164,7 @@ func (g *Gossiper) Run(uiPort string) {
         go g.SendPublicMessage("", false)
         go g.startRouteRumoring()
     }
-    go g.startMining()
+    go g.Blockchain.StartMining()
 }
 
 func (g *Gossiper) GetAddress() string {
@@ -239,10 +247,10 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
             g.HandlePktSearchReply(gp)
 
         case gp.TxPublish != nil:
-            g.HandlePktTxPublish(gp)
+            g.Blockchain.HandlePktTxPublish(gp)
 
         case gp.BlockPublish != nil:
-            g.HandlePktBlockPublish(gp)
+            g.Blockchain.HandlePktBlockPublish(gp)
 
         default:
             fmt.Println("WARNING: Unoknown message type")

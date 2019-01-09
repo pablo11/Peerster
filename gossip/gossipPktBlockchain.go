@@ -1,5 +1,5 @@
 package gossip
-
+/*
 import (
     "fmt"
     "time"
@@ -13,32 +13,78 @@ import (
 func (g *Gossiper) HandlePktTxPublish(gp *model.GossipPacket) {
     tp := gp.TxPublish
 
-    // Check if I have already seen this transactions since the last block mined
-    g.txsForNextBlockMutex.Lock()
-    for _, pendingTx := range g.txsForNextBlock {
-        if bytes.Equal(pendingTx.File.MetafileHash, tp.File.MetafileHash) && pendingTx.File.Name == tp.File.Name && pendingTx.File.Size == tp.File.Size {
-            g.txsForNextBlockMutex.Unlock()
-            fmt.Println("Discarding TxPublish since already received")
-            return
-        }
-    }
-    g.txsForNextBlockMutex.Unlock()
+    // Validate signature
+    if tp.Transaction.Signature != nil {
 
-    // Check that the TxPublish is valid, i.e. nobody has already claimed the name
-    g.filesNameMutex.Lock()
-    _, filenameAlreadyCaimed := g.filesName[tp.File.Name]
-    if filenameAlreadyCaimed {
-        g.filesNameMutex.Unlock()
-        fmt.Println("Discarding TxPublish since name already claimed")
+        // TODO: validate signature (get the public key of the identity with name tp.Transaction.Signature.Origin and call the IsValid method of Signature)
+
+    }
+
+    // Validate transaction according to its content
+    isValid, errorMsg := g.isValidTx(tp.Transaction)
+    if !isValid {
+        fmt.Println("Discarding TxPublish: " + errorMsg)
         return
     }
-    g.filesNameMutex.Unlock()
 
     // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
     g.addTxPublishToPool(*tp)
 
     // If HopLimit is > 1 decrement and broadcast
     g.broadcastTxPublishDecrementingHopLimit(tp)
+}
+
+func (g *Gossiper) isValidTx(tx *model.Transaction) (isValid bool, errorMsg string) {
+    errorMsg = nil
+    isValid = nil
+
+    switch {
+        case t.File != nil:
+            // Check if I have already seen this transactions since the last block mined
+            g.filesNameMutex.Lock()
+            _, filenameAlreadyCaimed := g.filesName[tx.File.Name]
+            if filenameAlreadyCaimed {
+                g.filesNameMutex.Unlock()
+                errorMsg = "Filename already claimed"
+                isValid = false
+                return
+            }
+            g.filesNameMutex.Unlock()
+
+
+        case t.Identity != nil:
+
+            // TODO: implement
+
+    }
+}
+
+func (g *Gossiper) addTxToPool(t model.Transaction) {
+    // Add only if not already there
+    g.txsPoolMutex.Lock()
+    alreadyPresnet := false
+    for _, tx := range g.txsPool {
+        if tx.File.Name == t.File.Name {
+            alreadyPresnet = true
+        }
+    }
+
+    if !alreadyPresnet {
+        var metafileHashCopy []byte = make([]byte, 32)
+        copy(metafileHashCopy[:], tp.File.MetafileHash[:])
+        tx := model.TxPublish{
+            File: model.File{
+                Name: tp.File.Name,
+                Size: tp.File.Size,
+                MetafileHash: metafileHashCopy,
+            },
+            HopLimit: tp.HopLimit,
+        }
+
+        g.txsForNextBlock = append(g.txsForNextBlock, tx)
+    }
+
+    g.txsPoolMutex.Unlock()
 }
 
 func (g *Gossiper) HandlePktBlockPublish(gp *model.GossipPacket) {
@@ -380,3 +426,4 @@ func (g *Gossiper) createBlockAndMine() *model.Block {
         }
     }
 }
+*/
