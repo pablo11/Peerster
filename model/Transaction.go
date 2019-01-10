@@ -79,6 +79,16 @@ func (t *Transaction) Copy() Transaction {
     }
 }
 
+func (t *Transaction) String() string {
+    switch {
+        case t.File != nil:
+            return t.File.String()
+
+        case t.Identity != nil:
+            return t.Identity.String()
+    }
+    return ""
+}
 
 // Identity transaction ========================================================
 
@@ -94,6 +104,10 @@ func (i *Identity) Hash() (out [32]byte) {
     h.Write(i.PublicKey)
     copy(out[:], h.Sum(nil))
     return
+}
+
+func (i *Identity) String() string {
+    return "ID=" + i.Name + "(" + hex.EncodeToString(i.PublicKey) + ")"
 }
 
 

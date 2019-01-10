@@ -10,7 +10,7 @@ import (
     "bytes"
 )
 
-const MINING_DIFFICULTY int = 6 // Each unit of mining difficulty corresponds to 4 bits
+const MINING_DIFFICULTY int = 5 // Each unit of mining difficulty corresponds to 4 bits
 
 type BlockPublish struct {
     Block Block
@@ -65,9 +65,9 @@ func (b *Block) IsValid() bool {
 }
 
 func (b *Block) Copy() Block {
-    var prevHashCopy [32]byte// = make([]byte, 32)
+    var prevHashCopy [32]byte = [32]byte{}
     copy(prevHashCopy[:], b.PrevHash[:])
-    var nonceCopy [32]byte// = make([]byte, 32)
+    var nonceCopy [32]byte = [32]byte{}
     copy(nonceCopy[:], b.Nonce[:])
 
     transactionsCopy := make([]Transaction, len(b.Transactions))
@@ -87,11 +87,10 @@ func (b *Block) IsGenesis() bool {
 }
 
 func (b *Block) String() string {
-    /*
-    filenames := make([]string, len(b.Transactions))
-    for i, trx := range b.Transactions {
-        filenames[i] = trx.File.Name
+    transactionsStr := make([]string, len(b.Transactions))
+    for i, tx := range b.Transactions {
+        transactionsStr[i] = tx.String()
     }
-    */
-    return b.HashStr() + ":" + b.PrevHashStr() + ":transactions" // + strings.Join(filenames, ",")
+
+    return b.HashStr() + ":" + b.PrevHashStr() + ":" + strings.Join(transactionsStr, ",")
 }

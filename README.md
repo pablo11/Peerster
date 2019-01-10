@@ -82,6 +82,6 @@ Chain of 3 peers A<->B<->C
 #### The client
 `./client -UIPort=10001 -msg=hello`
 `./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
-`./client -UIPort=10001 -file=2chunks.txt`
+`./client -UIPort=10001 -file=2chunks.test`
 
 # TODO

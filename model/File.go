@@ -53,7 +53,7 @@ func (f *File) HashStr() string {
 }
 
 func (f *File) Copy() File {
-    var metafileHashCopy []byte
+    var metafileHashCopy []byte = make([]byte, 32)
     copy(metafileHashCopy[:], f.MetafileHash[:])
 
     return File{
@@ -61,4 +61,8 @@ func (f *File) Copy() File {
         Size: f.Size,
         MetafileHash: metafileHashCopy,
     }
+}
+
+func (f *File) String() string {
+    return "FILE=" + f.Name
 }
