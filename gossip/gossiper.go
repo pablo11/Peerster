@@ -10,6 +10,7 @@ import (
     "time"
     "github.com/dedis/protobuf"
     "github.com/pablo11/Peerster/model"
+    "github.com/pablo11/Peerster/util/util"
     "github.com/pablo11/Peerster/util/collections"
 )
 
@@ -93,7 +94,7 @@ type Gossiper struct {
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
-    udpAddr := resolveAddress(address)
+    udpAddr := util.ResolveAddress(address)
     udpConn, err := net.ListenUDP("udp4", udpAddr)
     if err != nil {
         log.Fatal(err)
@@ -261,7 +262,7 @@ func (g *Gossiper) handlePeerReceivedPacket(gp *model.GossipPacket, fromAddrStr 
 
 func (g *Gossiper) listenClient(uiPort string) {
     var err error = nil
-    udpAddr := resolveAddress("127.0.0.1:" + uiPort)
+    udpAddr := util.ResolveAddress("127.0.0.1:" + uiPort)
     conn, err := net.ListenUDP("udp4", udpAddr)
     if err != nil {
         fmt.Println(err)
@@ -485,7 +486,7 @@ func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) 
     }
 
     for i := 0; i < len(peersAddr); i++ {
-        addr := resolveAddress(peersAddr[i])
+        addr := util.ResolveAddress(peersAddr[i])
         if (addr != nil) {
             if _, err2 := g.conn.WriteToUDP(packetBytes, addr); err2 != nil {
                 fmt.Println(err2)

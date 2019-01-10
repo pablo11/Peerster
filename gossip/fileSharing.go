@@ -10,6 +10,7 @@ import (
     "sync"
     "encoding/hex"
     "github.com/pablo11/Peerster/model"
+    "github.com/pablo11/Peerster/util/util"
 )
 
 const MAX_CHUNK_SIZE = 8192 // Chunk size in byte (8KB)
@@ -89,7 +90,7 @@ func (fs *FileSharing) IndexFile(path string) {
         }
 
         // Compute hash of chunk
-        hashBytes = hash(buffer[:bytesread])
+        hashBytes = util.Hash(buffer[:bytesread])
         err = fs.writeBytesToFile(hex.EncodeToString(hashBytes), buffer[:bytesread])
         if (err != nil) {
             return
@@ -100,7 +101,7 @@ func (fs *FileSharing) IndexFile(path string) {
         nbChunks += 1
     }
 
-    metaHash := hash(metafile)
+    metaHash := util.Hash(metafile)
 
     fmt.Printf("METAHASH: %x\n", metaHash)
 
@@ -266,7 +267,7 @@ func (fs *FileSharing) HandleDataRequest(dr *model.DataRequest) {
             Origin: fs.gossiper.Name,
             Destination: dr.Origin,
             HopLimit: 10,
-            HashValue: hash(bytesToSend),
+            HashValue: util.Hash(bytesToSend),
             Data: bytesToSend,
         }
 

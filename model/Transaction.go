@@ -31,8 +31,10 @@ func (t *Transaction) Hash() (out [32]byte) {
 
     h := sha256.New()
     h.Write(txContentHash[:])
-    h.Write([]byte(t.Signature.Origin))
-    h.Write(t.Signature.Signature)
+    if t.Signature != nil {
+        h.Write([]byte(t.Signature.Origin))
+        h.Write(t.Signature.Signature)
+    }
     copy(out[:], h.Sum(nil))
     return
 }

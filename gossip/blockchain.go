@@ -8,6 +8,7 @@ import (
     "math/rand"
     "encoding/hex"
     "github.com/pablo11/Peerster/model"
+    //"github.com/pablo11/Peerster/util/debug"
 )
 
 type Blockchain struct {
@@ -62,15 +63,28 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
 
     }
 
-    // Validate transaction according to its content
-    isValid, errorMsg := b.isValidTx(&tp.Transaction)
-    if !isValid {
-        fmt.Println("Discarding TxPublish: " + errorMsg)
-        return
+    // Discard transactions that is already in the pool
+    txAlreadyInPool := false
+    b.txsPoolMutex.Lock()
+    for _, tx := range b.txsPool {
+        if tx.HashStr() == tp.Transaction.HashStr() {
+            txAlreadyInPool = true
+            break
+        }
     }
+    b.txsPoolMutex.Unlock()
 
-    // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-    b.addTxToPool(tp.Transaction)
+    if !txAlreadyInPool {
+        // Validate transaction according to its content
+        isValid, errorMsg := b.isValidTx(&tp.Transaction)
+        if !isValid {
+            fmt.Println("Discarding TxPublish: " + errorMsg)
+            return
+        }
+
+        // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
+        b.addTxToPool(tp.Transaction)
+    }
 
     // If HopLimit is > 1 decrement and broadcast
     b.broadcastTxPublishDecrementingHopLimit(tp)
@@ -78,7 +92,7 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
 
 func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg string) {
     errorMsg = ""
-    isValid = false
+    isValid = true
 
     switch {
         case tx.File != nil:
