@@ -50,13 +50,8 @@ func (t *Transaction) Copy() Transaction {
 
     switch {
         case t.File != nil:
-            var metafileHashCopy []byte = make([]byte, 32)
-            copy(metafileHashCopy[:], t.File.MetafileHash[:])
-            file = &File{
-                Name: t.File.Name,
-                Size: t.File.Size,
-                MetafileHash: metafileHashCopy,
-            }
+            fileCopy := t.File.Copy()
+            file = &fileCopy
 
         case t.Identity != nil:
             var publicKeyCopy []byte = make([]byte, 32)

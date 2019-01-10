@@ -154,6 +154,15 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
+    // Validate all transactions in the block before integrating it into the blockchain
+    for _, tx := range bp.Block.Transactions {
+        isValid, errMsg := b.isValidTx(tx)
+        if !isValid {
+            fmt.Println("Invalid transaction: " + errorMsg)
+            return
+        }
+    }
+
     //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
 
     // Store block
