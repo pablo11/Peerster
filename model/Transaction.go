@@ -9,8 +9,8 @@ import (
 type Transaction struct {
     File *File
     Identity *Identity
-    /*
     ShareTx *ShareTx
+    /*
     VotingRequest *VotingRequest
     VotingReply *VotingReply
     ...
@@ -26,6 +26,9 @@ func (t *Transaction) Hash() (out [32]byte) {
 
         case t.Identity != nil:
             txContentHash = t.Identity.Hash()
+
+        case t.ShareTx != nil:
+            txContentHash = t.ShareTx.Hash()
 
     }
 
@@ -47,6 +50,7 @@ func (t *Transaction) HashStr() string {
 func (t *Transaction) Copy() Transaction {
     var file *File = nil
     var identity *Identity = nil
+    var shareTx *ShareTx = nil
 
     switch {
         case t.File != nil:
@@ -60,6 +64,10 @@ func (t *Transaction) Copy() Transaction {
                 Name: t.Identity.Name,
                 PublicKey: publicKeyCopy,
             }
+
+        case t.ShareTx != nil:
+            shareTxCopy := t.ShareTx.Copy()
+            shareTx = &shareTxCopy
     }
 
     var signature *Signature = nil
@@ -76,6 +84,7 @@ func (t *Transaction) Copy() Transaction {
         File: file,
         Identity: identity,
         Signature: signature,
+        ShareTx: shareTx,
     }
 }
 
@@ -86,6 +95,9 @@ func (t *Transaction) String() string {
 
         case t.Identity != nil:
             return t.Identity.String()
+
+        case t.ShareTx != nil:
+            return t.ShareTx.String()
     }
     return ""
 }
