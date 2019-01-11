@@ -131,10 +131,47 @@ func NewPrivateKey() *rsa.PrivateKey {
     return privateKey
 }
 
-
 // ===== Encrypt =====
-//TODO
+func (g *Gossiper) Encrypt(data []byte, publicKey *rsa.PublicKey) []byte {
+    label := []byte("orders") // Optional?
+
+    rng := rand.Reader
+
+    encryptedData, err := EncryptOAEP(sha256.New(), rng, publicKey, data, label)
+    if err != nil {
+            fmt.Fprintf(os.Stderr, "Error encrypting data: %v\n", err)
+            return
+    }
+
+    //fmt.Printf("EncryptedData: %x\n", encryptedData)
+
+    return encryptedData
+}
+
+// TODO: func Encrypt for each transaction type
+
 
 
 // ===== Decrypt =====
-//TODO
+func (g *Gossiper) Decrypt(encryptedData []byte) []byte {
+    label := []byte("orders") // Optional?
+
+    rng := rand.Reader
+
+    plainData, err := DecryptOAEP(sha256.New(), rng, test2048Key, encryptedData, label)
+    if err != nil {
+            fmt.Fprintf(os.Stderr, "Error from decryption: %s\n", err)
+            return
+    }
+
+    fmt.Printf("Plain Data: %s\n", string(plainData))
+
+    return plainData
+}
+
+// TODO: func Decrypt for each transaction type
+
+
+
+
+// QUESTION: should we encrypt messages as well?
