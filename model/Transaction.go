@@ -4,6 +4,7 @@ import (
     "crypto/sha256"
     "encoding/hex"
     "encoding/binary"
+    "crypto/rsa"
 )
 
 type Transaction struct {
@@ -94,7 +95,7 @@ func (t *Transaction) String() string {
 
 type Identity struct {
     Name string
-    PublicKey []byte
+    PublicKey rsa.PublicKey
 }
 
 func (i *Identity) Hash() (out [32]byte) {
@@ -107,7 +108,7 @@ func (i *Identity) Hash() (out [32]byte) {
 }
 
 func (i *Identity) String() string {
-    return "ID=" + i.Name + "(" + hex.EncodeToString(i.PublicKey) + ")"
+    return "ID=" + i.Name + " (" + hex.EncodeToString(i.PublicKey) + ")"
 }
 
 

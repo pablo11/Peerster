@@ -8,6 +8,7 @@ import (
     "sync"
     "math/rand"
     "time"
+    "crypto/rsa"
     "github.com/dedis/protobuf"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/util"
@@ -67,6 +68,7 @@ type Gossiper struct {
     FullMatchesMutex sync.Mutex
 
     Blockchain *Blockchain
+    PrivateKey *rsa.PrivateKey
 
 /*
     blockchain []*model.Block
@@ -127,6 +129,7 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
         FullMatchesMutex: sync.Mutex{},
 
         Blockchain: NewBlockchain(),
+        PrivateKey: NewPrivateKey(),
 
 // Can be removed
 /*
