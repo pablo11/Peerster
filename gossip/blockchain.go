@@ -33,10 +33,7 @@ type Blockchain struct {
     // Mapping of identities in the blockchain [k: Name => v: Identity]
     identities map[string]*model.Identity
     identitiesMutex sync.Mutex
-	
-	// Mapping of assetName to shareholders in the blockchain [k: AssetName => v: []Identity]
-    shareholders map[string][]*model.Identity //TO BE CHANGED BECAUSE IDENTITY + THEIR SHARE
-    shareholdersMutex sync.Mutex
+
 	
 	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: []VotationStatement]
     voteStatement map[string][]*model.VotationStatement
@@ -45,6 +42,11 @@ type Blockchain struct {
 	// Mapping of votation_id to array of VotationReplyWrapped in the blockchain [k: votation_id => v: []VotationReplyWrapped]
 	voteAnswers map[string][]*model.VotationAnswerWrapped
 	voteAnswersMutex sync.Mutex
+
+    // Mapping of assets to users holdings: [assetName: string => [holderName: string => amount: uint64]]
+    assets map[string]map[string]uint64
+    assetsMutex sync.Mutex
+
 }
 
 func NewBlockchain() *Blockchain {
@@ -66,14 +68,15 @@ func NewBlockchain() *Blockchain {
         identities: make(map[string]*model.Identity),
         identitiesMutex: sync.Mutex{},
 		
-		shareholders: make(map[string][]*model.Identity),
-        shareholdersMutex: sync.Mutex{},
-		
 		voteStatement: make(map[string][]*model.VotationStatement),
         voteStatementMutex: sync.Mutex{},
 		
 		voteAnswers: make(map[string][]*model.VotationAnswerWrapped),
         voteAnswersMutex: sync.Mutex{},
+
+        assets: make(map[string]map[string]uint64),
+        assetsMutex: sync.Mutex{},
+
     }
 }
 
@@ -140,6 +143,48 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 
             // TODO: implement
 
+        case tx.ShareTx != nil:
+
+
+            // TODO: make sure that the destinatary of the transaction is in the blockchain identities.
+            // Also make sure that the transaction is signed by the private key corresponding to the public key claimed by the from name
+
+
+            // Check if the asset already exists
+            b.assetsMutex.Lock()
+            asset, assetExists := b.assets[tx.ShareTx.Asset]
+            b.assetsMutex.Unlock()
+
+            if assetExists && asset[tx.ShareTx.From] < tx.ShareTx.Amount {
+                errorMsg = tx.ShareTx.From + " doesn't have enough " + tx.ShareTx.Asset
+                isValid = false
+                return
+            }
+
+            /*
+            if assetExists {
+
+                // TODO: make sure Fom and To are present in the asset shares mapping
+
+                // The asset exists, we need to do a transaction from one holder to another
+                if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
+                    // The holder doesn't have enough to asset to perform the transaction
+
+
+                } else {
+                    b.assetsMutex.Lock()
+                    asset[tx.ShareTx.From] -= tx.ShareTx.Amount
+                    asset[tx.ShareTx.To] += tx.ShareTx.Amount
+                    b.assetsMutex.Unlock()
+                }
+            } else {
+                // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
+                b.assetsMutex.Lock()
+                b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
+                b.assets[tx.ShareTx.Asset][tx.ShareTx.From] = tx.ShareTx.Amount
+                b.assetsMutex.Unlock()
+            }
+            //*/
     }
     return
 }

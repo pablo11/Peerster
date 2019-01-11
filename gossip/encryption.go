@@ -32,8 +32,8 @@ func (g *Gossiper) Encrypt(data []byte, publicKey *rsa.PublicKey) []byte {
 
     encryptedData, err := rsa.EncryptOAEP(sha256.New(), rng, publicKey, data, label)
     if err != nil {
-            fmt.Fprintf(os.Stderr, "Error encrypting data: %v\n", err)
-            return nil
+        fmt.Fprintf(os.Stderr, "Error encrypting data: %v\n", err)
+        return nil
     }
 
     //fmt.Printf("EncryptedData: %x\n", encryptedData)
@@ -53,8 +53,8 @@ func (g *Gossiper) Decrypt(encryptedData []byte) []byte {
 
     plainData, err := rsa.DecryptOAEP(sha256.New(), rng, g.PrivateKey, encryptedData, label)
     if err != nil {
-            fmt.Fprintf(os.Stderr, "Error from decryption: %s\n", err)
-            return nil
+        fmt.Fprintf(os.Stderr, "Error from decryption: %s\n", err)
+        return nil
     }
 
     fmt.Printf("Plain Data: %s\n", string(plainData))

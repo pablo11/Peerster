@@ -8,10 +8,7 @@ import (
 type Transaction struct {
     File *File
     Identity *Identity
-    /*
     ShareTx *ShareTx
-    ...
-    */
 	VotationStatement *VotationStatement
     VotationAnswerWrapped *VotationAnswerWrapped
     Signature *Signature
@@ -25,6 +22,9 @@ func (t *Transaction) Hash() (out [32]byte) {
 
         case t.Identity != nil:
             txContentHash = t.Identity.Hash()
+
+        case t.ShareTx != nil:
+            txContentHash = t.ShareTx.Hash()
 
     }
 
@@ -44,30 +44,33 @@ func (t *Transaction) HashStr() string {
 }
 
 func (t *Transaction) Copy() Transaction {
-    var file *File = nil
-    var identity *Identity = nil
+    txCopy := Transaction{
+        File: nil,
+        Identity: nil,
+        Signature: nil,
+        ShareTx: nil,
+    }
 
     switch {
         case t.File != nil:
             fileCopy := t.File.Copy()
-            file = &fileCopy
+            txCopy.File = &fileCopy
 
         case t.Identity != nil:
             identityCopy := t.Identity.Copy()
-            identity = &identityCopy
+            txCopy.Identity = &identityCopy
+
+        case t.ShareTx != nil:
+            shareTxCopy := t.ShareTx.Copy()
+            txCopy.ShareTx = &shareTxCopy
     }
 
-    var signature *Signature = nil
     if t.Signature != nil {
         signatureCopy := t.Signature.Copy()
-        signature = &signatureCopy
+        txCopy.Signature = &signatureCopy
     }
 
-    return Transaction{
-        File: file,
-        Identity: identity,
-        Signature: signature,
-    }
+    return txCopy
 }
 
 func (t *Transaction) String() string {
@@ -77,26 +80,9 @@ func (t *Transaction) String() string {
 
         case t.Identity != nil:
             return t.Identity.String()
+
+        case t.ShareTx != nil:
+            return t.ShareTx.String()
     }
     return ""
 }
-
-
-
-// ShareTx transaction =========================================================
-/*
-type ShareTx struct {
-    Asset string
-    Amount uint64
-    To []byte // Public key of the destination account
-}
-
-func (st *ShareTx) Hash() (out [32]byte) {
-    h := sha256.New()
-    binary.Write(h, binary.LittleEndian, st.Amount))
-    h.Write([]byte(st.Asset))
-    h.Write(i.To)
-    copy(out[:], h.Sum(nil))
-    return
-}
-*/
