@@ -11,8 +11,6 @@ type Signature struct {
     Signature []byte
 }
 
-
-
 func NewPrivateKey() *rsa.PrivateKey {
     rng := rand.Reader
 

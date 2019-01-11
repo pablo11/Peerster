@@ -9,7 +9,6 @@ import (
     "github.com/dedis/protobuf"
 )
 
-
 type Identity struct {
     Name string
     PublicKey rsa.PublicKey
@@ -19,9 +18,7 @@ func (i *Identity) Hash() (out [32]byte) {
     h := sha256.New()
     binary.Write(h, binary.LittleEndian, uint32(len(i.Name)))
     h.Write([]byte(i.Name))
-
     h.Write(i.bytePublicKey())
-
     copy(out[:], h.Sum(nil))
     return
 }
@@ -34,12 +31,10 @@ func (i *Identity) bytePublicKey() []byte {
     bytePublicKey, err := protobuf.Encode(&i.PublicKey)
     if err != nil {
         fmt.Println(err)
-        err = nil
         return nil
     }
     return bytePublicKey
 }
-
 
 func (i *Identity) Copy() Identity {
     newIdentity := Identity{

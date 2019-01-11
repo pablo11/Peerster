@@ -69,30 +69,6 @@ type Gossiper struct {
 
     Blockchain *Blockchain
     PrivateKey *rsa.PrivateKey
-
-/*
-    blockchain []*model.Block
-    blockchainMutex sync.Mutex
-
-    // Mapping of filenames in the blockchain
-    filesName map[string]*model.File
-    filesNameMutex sync.Mutex
-
-    txsForNextBlock []model.TxPublish
-    txsForNextBlockMutex sync.Mutex
-
-    txsPool []model.Transaction
-    txsPoolMutex sync.Mutex
-
-    blocks map[string]*model.Block
-    blocksMutex sync.RWMutex
-
-    // Store the hash of the last block of each fork with the respective blockchain length
-    forks map[string]uint64
-    forksMutex sync.Mutex
-
-    longestChain string
-    */
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -130,27 +106,6 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
 
         Blockchain: NewBlockchain(),
         PrivateKey: NewPrivateKey(),
-
-// Can be removed
-/*
-        blockchain: make([]*model.Block, 0),
-        blockchainMutex: sync.Mutex{},
-        filesName: make(map[string]*model.File),
-        filesNameMutex: sync.Mutex{},
-        txsForNextBlock: make([]model.TxPublish, 0),
-        txsForNextBlockMutex: sync.Mutex{},
-
-        txsPool: make([]model.Transaction, 0),
-        txsPoolMutex: sync.Mutex{},
-
-        blocks: make(map[string]*model.Block),
-        blocksMutex: sync.RWMutex{},
-
-        forks: make(map[string]uint64),
-        forksMutex: sync.Mutex{},
-
-        longestChain: "",
-        */
     }
 }
 
