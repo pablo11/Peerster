@@ -6,3 +6,4 @@ _Chunks/*
 _Downloads/*
 _SharedFiles/*
 !_SharedFiles/*.test
+*.DS_Store

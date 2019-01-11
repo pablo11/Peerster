@@ -30,6 +30,10 @@ type Blockchain struct {
     filenames map[string]*model.File
     filenamesMutex sync.Mutex
 
+    // Mapping of identities in the blockchain [k: Name => v: Identity]
+    identities map[string]*model.Identity
+    identitiesMutex sync.Mutex
+
     // Mapping of assets to users holdings: [assetName: string => [holderName: string => amount: uint64]]
     assets map[string]map[string]uint64
     assetsMutex sync.Mutex
@@ -50,6 +54,9 @@ func NewBlockchain() *Blockchain {
 
         filenames: make(map[string]*model.File),
         filenamesMutex: sync.Mutex{},
+
+        identities: make(map[string]*model.Identity),
+        identitiesMutex: sync.Mutex{},
 
         assets: make(map[string]map[string]uint64),
         assetsMutex: sync.Mutex{},

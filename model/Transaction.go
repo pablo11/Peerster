@@ -3,7 +3,6 @@ package model
 import (
     "crypto/sha256"
     "encoding/hex"
-    "encoding/binary"
 )
 
 type Transaction struct {
@@ -35,7 +34,7 @@ func (t *Transaction) Hash() (out [32]byte) {
     h := sha256.New()
     h.Write(txContentHash[:])
     if t.Signature != nil {
-        h.Write([]byte(t.Signature.Origin))
+        h.Write([]byte(t.Signature.Name))
         h.Write(t.Signature.Signature)
     }
     copy(out[:], h.Sum(nil))
@@ -58,12 +57,8 @@ func (t *Transaction) Copy() Transaction {
             file = &fileCopy
 
         case t.Identity != nil:
-            var publicKeyCopy []byte = make([]byte, 32)
-            copy(publicKeyCopy[:], t.Identity.PublicKey[:])
-            identity = &Identity{
-                Name: t.Identity.Name,
-                PublicKey: publicKeyCopy,
-            }
+            identityCopy := t.Identity.Copy()
+            identity = &identityCopy
 
         case t.ShareTx != nil:
             shareTxCopy := t.ShareTx.Copy()
@@ -72,12 +67,8 @@ func (t *Transaction) Copy() Transaction {
 
     var signature *Signature = nil
     if t.Signature != nil {
-        var signCopy []byte = make([]byte, 32)
-        copy(signCopy[:], t.Signature.Signature[:])
-        signature = &Signature{
-            Origin: t.Signature.Origin,
-            Signature: signCopy,
-        }
+        signatureCopy := t.Signature.Copy()
+        signature = &signatureCopy
     }
 
     return Transaction{
@@ -102,25 +93,6 @@ func (t *Transaction) String() string {
     return ""
 }
 
-// Identity transaction ========================================================
-
-type Identity struct {
-    Name string
-    PublicKey []byte
-}
-
-func (i *Identity) Hash() (out [32]byte) {
-    h := sha256.New()
-    binary.Write(h, binary.LittleEndian, uint32(len(i.Name)))
-    h.Write([]byte(i.Name))
-    h.Write(i.PublicKey)
-    copy(out[:], h.Sum(nil))
-    return
-}
-
-func (i *Identity) String() string {
-    return "ID=" + i.Name + "(" + hex.EncodeToString(i.PublicKey) + ")"
-}
 
 
 // ShareTx transaction =========================================================
