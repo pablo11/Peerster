@@ -13,7 +13,6 @@ type VotationAnswerWrapper struct{
 	Answer 		[]byte
 	Question	string
 	Origin		string
-	Signature	Signature //POINTER?
 }
 
 func (*VotationAnswerWrapper vaw) Hash() string{
@@ -21,9 +20,6 @@ func (*VotationAnswerWrapper vaw) Hash() string{
 	sha_256.Write(vaw.Answer)
 	sha_256.Write([]byte(vaw.Question))
 	sha_256.Write([]byte(vaw.Origin))
-	//TO BE COMPLETE WITH RIC CODE FOR SIGNATURE
-	sha_256.Write([]byte(vaw.Signature.Name))
-	sha_256.Write([]byte(vaw.Signature.Signature))
 	
 	return hex.EncodeToString(sha_256.Sum(nil))
 }
@@ -31,16 +27,11 @@ func (*VotationAnswerWrapper vaw) Hash() string{
 func (*VotationAnswerWrapper vaw) Copy() VotationAnswerWrapper {
 	new_answer := make([]byte, len(vaw.Answer))
 	copy(new_answer,vaw.Answer)
-	new_sig_sig := make([]byte, len(vaw.Signature.Signature))
-	copy(new_sig_sig, vaw.Signature.Signature)
-	
-	new_sign := vaw.Signature.Copy()
 	
 	new_vaw := VotationAnswerWrapper{
 		Answer: new_answer,
 		Question: vaw.Question,
 		Origin:	vaw.Origin,
-		Signature:	new_sign,
 	}
 	
 	return new_vaw

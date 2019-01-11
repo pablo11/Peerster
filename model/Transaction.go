@@ -10,10 +10,10 @@ type Transaction struct {
     Identity *Identity
     /*
     ShareTx *ShareTx
-    VotingRequest *VotingRequest
-    VotingReply *VotingReply
     ...
     */
+	VotationStatement *VotationStatement
+    VotationAnswerWrapped *VotationAnswerWrapped
     Signature *Signature
 }
 

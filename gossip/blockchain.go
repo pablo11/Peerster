@@ -33,6 +33,18 @@ type Blockchain struct {
     // Mapping of identities in the blockchain [k: Name => v: Identity]
     identities map[string]*model.Identity
     identitiesMutex sync.Mutex
+	
+	// Mapping of assetName to shareholders in the blockchain [k: AssetName => v: []Identity]
+    shareholders map[string][]*model.Identity //TO BE CHANGED BECAUSE IDENTITY + THEIR SHARE
+    shareholdersMutex sync.Mutex
+	
+	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: []VotationStatement]
+    voteStatement map[string][]*model.VotationStatement
+    voteStatementMutex sync.Mutex
+	
+	// Mapping of votation_id to array of VotationReplyWrapped in the blockchain [k: votation_id => v: []VotationReplyWrapped]
+	voteAnswers map[string][]*model.VotationAnswerWrapped
+	voteAnswersMutex sync.Mutex
 }
 
 func NewBlockchain() *Blockchain {
@@ -53,6 +65,15 @@ func NewBlockchain() *Blockchain {
 
         identities: make(map[string]*model.Identity),
         identitiesMutex: sync.Mutex{},
+		
+		shareholders: make(map[string][]*model.Identity),
+        shareholdersMutex: sync.Mutex{},
+		
+		voteStatement: make(map[string][]*model.VotationStatement),
+        voteStatementMutex: sync.Mutex{},
+		
+		voteAnswers: make(map[string][]*model.VotationAnswerWrapped),
+        voteAnswersMutex: sync.Mutex{},
     }
 }
 
