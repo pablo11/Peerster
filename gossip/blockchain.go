@@ -108,7 +108,7 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
         }
 
         // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-        b.addTxToPool(&tp.Transaction)
+        b.addTxToPool(tp.Transaction)
     }
 
     // If HopLimit is > 1 decrement and broadcast
@@ -285,9 +285,9 @@ func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
 
     for i, tx := range txs {
         if tx.ShareTx != nil {
-            b.assetsMutex.Lock()
-            asset, assetExists := b.assets[tx.ShareTx.Asset]
-            b.assetsMutex.Unlock()
+            b.AssetsMutex.Lock()
+            asset, assetExists := b.Assets[tx.ShareTx.Asset]
+            b.AssetsMutex.Unlock()
 
             if assetExists {
                 // Check if sender has sufficeint balance
@@ -340,16 +340,16 @@ func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
 func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
     for _, tx := range txs {
         if tx.ShareTx != nil {
-            b.assetsMutex.Lock()
-            asset, assetExists := b.assets[tx.ShareTx.Asset]
-            b.assetsMutex.Unlock()
+            b.AssetsMutex.Lock()
+            asset, assetExists := b.Assets[tx.ShareTx.Asset]
+            b.AssetsMutex.Unlock()
             if assetExists {
                 // The asset exists, we need to do a transaction from the sender to the destinatary (is the sender has sufficient balance)
                 if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
                     // The holder doesn't have enough to asset to perform the transaction
                     fmt.Println("ShareTx discarded since the sender doesn't have a sufficient balance")
                 } else {
-                    b.assetsMutex.Lock()
+                    b.AssetsMutex.Lock()
                     asset[tx.ShareTx.From] -= tx.ShareTx.Amount
                     _, destinataryHashShares := asset[tx.ShareTx.To]
                     if destinataryHashShares {
@@ -357,14 +357,14 @@ func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
                     } else {
                         asset[tx.ShareTx.To] = tx.ShareTx.Amount
                     }
-                    b.assetsMutex.Unlock()
+                    b.AssetsMutex.Unlock()
                 }
             } else {
                 // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
-                b.assetsMutex.Lock()
-                b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
-                b.assets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
-                b.assetsMutex.Unlock()
+                b.AssetsMutex.Lock()
+                b.Assets[tx.ShareTx.Asset] = make(map[string]uint64)
+                b.Assets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+                b.AssetsMutex.Unlock()
             }
             //*/
 			
@@ -617,15 +617,15 @@ func (b *Blockchain) printBlockchain(headHash string) {
 
 func (b *Blockchain) printAssetsOwnership() {
 	toPrint := ""
-	b.assetsMutex.Lock()
-	for assetName, asset := range b.assets {
+	b.AssetsMutex.Lock()
+	for assetName, asset := range b.Assets {
 		toPrint += assetName + ":"
 		for ownerName, amount := range asset {
 			toPrint += "\n---" + ownerName + ": " + strconv.Itoa(int(amount))
 		}
 		toPrint += "\n"
 	}
-	b.assetsMutex.Unlock()
+	b.AssetsMutex.Unlock()
 
 	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
 }
