@@ -81,7 +81,7 @@ func (b *Blockchain) Verify(sig model.Signature, data []byte) bool {
         fmt.Printf("Identity not available in the blockchain\n")
         return false
     }
-    pub := &identity.PublicKey
+    pub := identity.PublicKeyObj()
 
     err := rsa.VerifyPSS(pub, crypto.SHA256, hashed[:], sig.Signature, &opts)
     if err != nil {

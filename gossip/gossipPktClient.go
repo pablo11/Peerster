@@ -32,7 +32,6 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
             }
 
         case "identity":
-            fmt.Println("Client new identity: " + cm.Identity)
             go g.Blockchain.SendIdentityTx(cm.Identity)
 
         default:

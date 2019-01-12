@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 	"github.com/pablo11/Peerster/model"
-	"github.com/pablo11/Peerster/util/debug"
+	//"github.com/pablo11/Peerster/util/debug"
 )
 
 type Blockchain struct {
@@ -268,6 +268,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
 		}
 	}
 
+    // 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨 TODO: MOVE THAT UP, not always 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+
 	// Integrate transactions
 	b.integrateValidTxs(&bp.Block)
 
@@ -285,9 +287,10 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 			b.filenamesMutex.Unlock()
 
 		case tx.Identity != nil:
-
-			// TODO
-
+            identityCopy := tx.Identity.Copy()
+            b.identitiesMutex.Lock()
+            b.identities[tx.Identity.Name] = &identityCopy
+            b.identitiesMutex.Unlock()
 		}
 	}
 }
@@ -375,7 +378,7 @@ func (b *Blockchain) printBlockchain(headHash string) {
 	}
 	b.blocksMutex.RUnlock()
 
-	fmt.Println("⛓ CHAIN" + chainStr)
+	fmt.Println("⛓ CHAIN" + chainStr + "\n")
 }
 
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {
@@ -489,7 +492,7 @@ func (b *Blockchain) createBlockAndMine() *model.Block {
 		}
 
 		if block.IsValid() {
-			fmt.Println("FOUND-BLOCK " + block.HashStr())
+			fmt.Println("FOUND-BLOCK " + block.HashStr() + "\n")
 
 			// Remove transactions mined from the txsForNextBlock (assume that there are no new TxPhublish added in the middle of the list)
 			b.txsPoolMutex.Lock()
@@ -502,19 +505,30 @@ func (b *Blockchain) createBlockAndMine() *model.Block {
 }
 
 func (b *Blockchain) SendIdentityTx(identityName string) {
-	newIdentity := &model.Identity{
+    b.identitiesMutex.Lock()
+    _, isThere := b.identities[identityName]
+    b.identitiesMutex.Unlock()
+    if isThere {
+        fmt.Printf("❗️ Cannot add the identity \"%v\" because already claimed \n\n", identityName)
+        return
+    }
+
+
+    newIdentity := &model.Identity{
 		Name: identityName,
 	}
 
 	var privateKey *rsa.PrivateKey
 
+
 	// Identity for THIS peer
 	if identityName == b.gossiper.Name {
 		privateKey = b.gossiper.PrivateKey
-		newIdentity.PublicKey = privateKey.PublicKey
+		newIdentity.SetPublicKey(&privateKey.PublicKey)
 	} else {
+        // Identity for ANOTHER peer
 		privateKey = NewPrivateKey()
-		newIdentity.PublicKey = privateKey.PublicKey
+		newIdentity.SetPublicKey(&privateKey.PublicKey)
 	}
 
 	fmt.Printf("👤 New Identity - Name: %v \n", identityName)
@@ -525,7 +539,7 @@ func (b *Blockchain) SendIdentityTx(identityName string) {
     fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
 
     // the first 19 chars are always the same
-    fmt.Printf("PublicKey:  %v\n", model.PublicKeyString(&newIdentity.PublicKey))
+    fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
 
 
 	tx := model.Transaction{
