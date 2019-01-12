@@ -18,8 +18,21 @@ func main() {
     request := flag.String("request", "", "Request a chunk or metafile of this hash")
     keywords := flag.String("keywords", "", "Keywords for the file search")
     budget := flag.Int("budget", 0, "Budget for the file search")
+    asset := flag.String("asset", "", "Name of the asset to create or transact")
+    amount := flag.Int("amount", 0, "Amount to send in an asset transaction")
+    identity := flag.String("identity", "", "Identity on the blockchain")
 
     flag.Parse()
+
+    // Ask to insert an identity on the blockchain
+    if *identity != "" {
+        cm := &model.ClientMessage{
+            Type: "identity",
+            Identity: *identity,
+        }
+        sendPacket(cm, *uiPort)
+        return
+    }
 
     // Ask to index file
     if *file != "" && *request == "" {
@@ -67,7 +80,23 @@ func main() {
         return
     }
 
-    fmt.Println("Please provide some parameters")
+    if *asset != "" && *dest != "" {
+        if uint64(*amount) <= 0 {
+            fmt.Println("Invalid amount of asset (it must be > 0)")
+            return
+        } else {
+            cm := &model.ClientMessage{
+                Type: "shareTx",
+                Dest: *dest,
+                Asset: *asset,
+                Amount: uint64(*amount),
+            }
+            sendPacket(cm, *uiPort)
+            return
+        }
+    }
+
+    fmt.Println("Please provide some valid parameters")
 }
 
 func sendPacket(cm *model.ClientMessage, uiPort string) {

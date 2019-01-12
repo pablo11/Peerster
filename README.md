@@ -57,6 +57,7 @@ The client allows multiple interactions:
 - Indexing a file (the file must be in the \_SharedFiles folder): `./client -UIPort=XXXX -file=filename`
 - Requesting a file to another peer: `./client -UIPort=XXXX -file=filename -dest=peerName -reqest=hashOfTheRequestedChunkOrMetafile`
 - Search files in the network by providing some keywords and optionally a budget: `./client -UIPort=XXXX -keywords=key1,key2 [-budget=4]`
+- Inserting a new identity in the blockchain: `./client -UIPort=XXXX -identity=YYYYYY`
 
 Navigate to the `/client` project's subdirectory in a terminal and type `go build`.
 
@@ -83,6 +84,8 @@ Chain of 3 peers A<->B<->C
 `./client -UIPort=10001 -msg=hello`
 `./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
 `./client -UIPort=10001 -file=2chunks.test`
+`./client -UIPort=10001 -identity=nodeA`
+
 
 # TODO
-Check new branch
+Check new branch crypto

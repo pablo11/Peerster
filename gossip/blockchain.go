@@ -1,39 +1,40 @@
 package gossip
 
 import (
-    "fmt"
-    "time"
-    "sync"
-    "bytes"
-    "math/rand"
-    "encoding/hex"
-    "github.com/pablo11/Peerster/model"
-    "github.com/pablo11/Peerster/util/debug"
+	"strconv"
+	"bytes"
+	"crypto/rsa"
+	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"sync"
+	"time"
+	"github.com/pablo11/Peerster/model"
+	"github.com/pablo11/Peerster/util/debug"
 )
 
 type Blockchain struct {
-    gossiper *Gossiper
+	gossiper *Gossiper
 
-    blocks map[string]*model.Block
-    blocksMutex sync.RWMutex
+	blocks      map[string]*model.Block
+	blocksMutex sync.RWMutex
 
-    // Store the hash of the last block of each fork with the respective blockchain length
-    forks map[string]uint64
-    forksMutex sync.Mutex
+	// Store the hash of the last block of each fork with the respective blockchain length
+	forks      map[string]uint64
+	forksMutex sync.Mutex
 
-    longestChain string
+	longestChain string
 
-    txsPool []model.Transaction
-    txsPoolMutex sync.Mutex
+	txsPool      []model.Transaction
+	txsPoolMutex sync.Mutex
 
-    // Mapping of filenames in the blockchain
-    filenames map[string]*model.File
-    filenamesMutex sync.Mutex
+	// Mapping of filenames in the blockchain
+	filenames      map[string]*model.File
+	filenamesMutex sync.Mutex
 
-    // Mapping of identities in the blockchain [k: Name => v: Identity]
-    identities map[string]*model.Identity
-    identitiesMutex sync.Mutex
-
+	// Mapping of identities in the blockchain [k: Name => v: Identity]
+	identities      map[string]*model.Identity
+	identitiesMutex sync.Mutex
 	
 	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: *VotationStatement]
     VoteStatement map[string]*model.VotationStatement
@@ -50,20 +51,20 @@ type Blockchain struct {
 }
 
 func NewBlockchain() *Blockchain {
-    return &Blockchain{
-        blocks: make(map[string]*model.Block),
-        blocksMutex: sync.RWMutex{},
+	return &Blockchain{
+		blocks:      make(map[string]*model.Block),
+		blocksMutex: sync.RWMutex{},
 
-        forks: make(map[string]uint64),
-        forksMutex: sync.Mutex{},
+		forks:      make(map[string]uint64),
+		forksMutex: sync.Mutex{},
 
-        longestChain: "",
+		longestChain: "",
 
-        txsPool: make([]model.Transaction, 0),
-        txsPoolMutex: sync.Mutex{},
+		txsPool:      make([]model.Transaction, 0),
+		txsPoolMutex: sync.Mutex{},
 
-        filenames: make(map[string]*model.File),
-        filenamesMutex: sync.Mutex{},
+		filenames:      make(map[string]*model.File),
+		filenamesMutex: sync.Mutex{},
 
         identities: make(map[string]*model.Identity),
         identitiesMutex: sync.Mutex{},
@@ -81,18 +82,11 @@ func NewBlockchain() *Blockchain {
 }
 
 func (b *Blockchain) SetGossiper(g *Gossiper) {
-    b.gossiper = g
+	b.gossiper = g
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
     tp := gp.TxPublish
-
-    // Validate signature
-    if tp.Transaction.Signature != nil {
-
-        // TODO: validate signature (get the public key of the identity with name tp.Transaction.Signature.Origin and call the IsValid method of Signature)
-
-    }
 
     // Discard transactions that is already in the pool
     txAlreadyInPool := false
@@ -145,47 +139,8 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
             // TODO: implement
 
         case tx.ShareTx != nil:
-
-
-            // TODO: make sure that the destinatary of the transaction is in the blockchain identities.
-            // Also make sure that the transaction is signed by the private key corresponding to the public key claimed by the from name
-
-
-            // Check if the asset already exists
-            b.AssetsMutex.Lock()
-            asset, assetExists := b.Assets[tx.ShareTx.Asset]
-            b.AssetsMutex.Unlock()
-
-            if assetExists && asset[tx.ShareTx.From] < tx.ShareTx.Amount {
-                errorMsg = tx.ShareTx.From + " doesn't have enough " + tx.ShareTx.Asset
-                isValid = false
-                return
-            }
-
-            /*
-            if assetExists {
-
-                // TODO: make sure Fom and To are present in the asset shares mapping
-
-                // The asset exists, we need to do a transaction from one holder to another
-                if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
-                    // The holder doesn't have enough to asset to perform the transaction
-
-
-                } else {
-                    b.assetsMutex.Lock()
-                    asset[tx.ShareTx.From] -= tx.ShareTx.Amount
-                    asset[tx.ShareTx.To] += tx.ShareTx.Amount
-                    b.assetsMutex.Unlock()
-                }
-            } else {
-                // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
-                b.assetsMutex.Lock()
-                b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
-                b.assets[tx.ShareTx.Asset][tx.ShareTx.From] = tx.ShareTx.Amount
-                b.assetsMutex.Unlock()
-            }
-            //*/
+            // Check if the two identities in the share transaction are in the blockchain and that the transaction is validly signed by the sender of the transaction
+            isValid, errorMsg = b.isShareTxValidlySigned(tx.ShareTx)
 			
 		case tx.VotationAnswerWrapper != nil:
 			//To be rejected, a votation answer wrapped:
@@ -281,24 +236,156 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			}
 		
 			debug.Debug("Checking votation statement transaction correctness -> OK")
-		
     }
     return
 }
 
-func (b *Blockchain) addTxToPool(t *model.Transaction) {
-    // Add only if not already there
-    b.txsPoolMutex.Lock()
-    for _, tx := range b.txsPool {
-        if tx.HashStr() == t.HashStr() {
-            b.txsPoolMutex.Unlock()
-            return
-        }
+func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, errorMsg string) {
+    errorMsg = ""
+    isValid = true
+
+    // Make sure that the sender (From) and destinatary (To) identities are in the blockchain
+	if st.From != "" {
+		b.identitiesMutex.Lock()
+	    _ /*fromIdentity*/, isFromRegistered := b.identities[st.From]
+	    b.identitiesMutex.Unlock()
+		if !isFromRegistered {
+			errorMsg = "No identities found for the sender of the share transaction"
+	        isValid = false
+	        return
+		}
+	}
+
+	b.identitiesMutex.Lock()
+    _ /*toIdentity*/, isToRegistered := b.identities[st.To]
+    b.identitiesMutex.Unlock()
+    if !isToRegistered {
+        errorMsg = "No identities found for the destinatary of the share transaction"
+        isValid = false
+        return
     }
 
-    // Append a copy of the transaction to the pool of transactions for newxt block
-    b.txsPool = append(b.txsPool, t.Copy())
-    b.txsPoolMutex.Unlock()
+    // Validate signature with the identity of the sender (From)
+
+    isValidSignature := true // TODO: need to check the signature against the sender identity
+
+    if !isValidSignature {
+        errorMsg = "Invalid signature of share transaction"
+        isValid = false
+        return
+    }
+
+    return
+}
+
+// This function assumes that the ShareTxs's signature contained in the list of transactions are already validated
+// To simplify the implementation, the order of thransactions in the block must be valid to be accepted
+func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
+    tmpAssets := make(map[string]map[string]uint64)
+
+    for i, tx := range txs {
+        if tx.ShareTx != nil {
+            b.assetsMutex.Lock()
+            asset, assetExists := b.assets[tx.ShareTx.Asset]
+            b.assetsMutex.Unlock()
+
+            if assetExists {
+                // Check if sender has sufficeint balance
+                _, tmpAssetPresent := tmpAssets[tx.ShareTx.Asset]
+                if !tmpAssetPresent {
+                    // The asset doesn't exist in our temporary version of the assets, get the user balance from
+                    fromBalance, fromBalanceExists := asset[tx.ShareTx.From]
+                    if !fromBalanceExists {
+                        debug.Debug("Discarding block: invalid asset transaction " + strconv.Itoa(i) + " - " + tx.ShareTx.From)
+                        return false
+                    }
+                    tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] = fromBalance
+
+                    toBalance, toBalanceExists := asset[tx.ShareTx.To]
+                    if !toBalanceExists {
+                        toBalance = 0
+                    }
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = toBalance
+                }
+
+                fromAmount, fromAmountNonzero := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From]
+                if !fromAmountNonzero || fromAmount < tx.ShareTx.Amount {
+                    debug.Debug("Discarding block: invalid asset transaction2")
+                    return false
+                } else {
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] -= tx.ShareTx.Amount
+                    if tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] == 0 {
+                        delete(tmpAssets[tx.ShareTx.Asset], tx.ShareTx.From)
+                    }
+
+                    _, toAmountExists := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To]
+                    if toAmountExists {
+                        tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] += tx.ShareTx.Amount
+                    } else {
+                        tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+                    }
+                }
+            } else {
+                // Create the new asset
+                tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
+                tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+            }
+        }
+    }
+    return true
+}
+
+// This function assumes that the transaction and it's content is already validated (identities existence, valid signature, prevent doublespending)
+func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
+    for _, tx := range txs {
+        if tx.ShareTx != nil {
+            b.assetsMutex.Lock()
+            asset, assetExists := b.assets[tx.ShareTx.Asset]
+            b.assetsMutex.Unlock()
+            if assetExists {
+                // The asset exists, we need to do a transaction from the sender to the destinatary (is the sender has sufficient balance)
+                if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
+                    // The holder doesn't have enough to asset to perform the transaction
+                    fmt.Println("ShareTx discarded since the sender doesn't have a sufficient balance")
+                } else {
+                    b.assetsMutex.Lock()
+                    asset[tx.ShareTx.From] -= tx.ShareTx.Amount
+                    _, destinataryHashShares := asset[tx.ShareTx.To]
+                    if destinataryHashShares {
+                        asset[tx.ShareTx.To] += tx.ShareTx.Amount
+                    } else {
+                        asset[tx.ShareTx.To] = tx.ShareTx.Amount
+                    }
+                    b.assetsMutex.Unlock()
+                }
+            } else {
+                // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
+                b.assetsMutex.Lock()
+                b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
+                b.assets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+                b.assetsMutex.Unlock()
+            }
+            //*/
+			
+		}
+	}
+}
+
+
+func (b *Blockchain) addTxToPool(t model.Transaction) {
+	// Add only if not already there
+	b.txsPoolMutex.Lock()
+	for _, tx := range b.txsPool {
+		if tx.HashStr() == t.HashStr() {
+			b.txsPoolMutex.Unlock()
+			return
+		}
+	}
+
+	// Append a copy of the transaction to the pool of transactions for newxt block
+	b.txsPool = append(b.txsPool, t.Copy())
+	b.txsPoolMutex.Unlock()
 }
 
 func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
@@ -331,6 +418,13 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
             fmt.Println("Invalid transaction: " + errorMsg)
             return
         }
+    }
+
+    // Validate transactions of type ShareTx
+    validTxShares := b.validateBlockShareTxs(bp.Block.Transactions)
+    if !validTxShares {
+        fmt.Println("Invalid asset transactions")
+        return
     }
 
     //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
@@ -384,8 +478,12 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         }
     }
 
+	// 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨 TODO: MOVE THAT UP, not always 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+
     // Integrate transactions
     b.integrateValidTxs(&bp.Block)
+
+	b.printAssetsOwnership()
 
     // If HopLimit is > 1 decrement and broadcast
     b.broadcastBlockPublishDecrementingHopLimit(bp)
@@ -401,8 +499,11 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
                 b.filenamesMutex.Unlock()
 
             case tx.Identity != nil:
+				identityCopy := tx.Identity.Copy()
+				b.identitiesMutex.Lock()
+				b.identities[tx.Identity.Name] = &identityCopy
+				b.identitiesMutex.Unlock()
 
-                // TODO
 				
 			case tx.VotationAnswerWrapper != nil:
 				vawCopy := tx.VotationAnswerWrapper.Copy()
@@ -424,210 +525,294 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 				b.VoteStatementMutex.Unlock()
         }
     }
+
+    b.applyShareTxs(block.Transactions)
 }
 
 func (b *Blockchain) updateLongestChain(blockHashStr string, block *model.Block) {
-    b.longestChain = blockHashStr
+	b.longestChain = blockHashStr
 
-    // Remove transactions from pool of transactions for next block to mine
-    b.txsPoolMutex.Lock()
-    txsForNextBlock := make([]model.Transaction, 0)
-    if block != nil {
-        for _, f := range b.txsPool {
-            toAdd := true
-            for _, tx := range block.Transactions {
-                if tx.HashStr() == f.HashStr() {
-                    toAdd = false
-                }
-            }
-            if toAdd {
-                txsForNextBlock = append(txsForNextBlock, f)
-            }
-        }
-    }
-    b.txsPool = txsForNextBlock
-    b.txsPoolMutex.Unlock()
+	// Remove transactions from pool of transactions for next block to mine
+	b.txsPoolMutex.Lock()
+	txsForNextBlock := make([]model.Transaction, 0)
+	if block != nil {
+		for _, f := range b.txsPool {
+			toAdd := true
+			for _, tx := range block.Transactions {
+				if tx.HashStr() == f.HashStr() {
+					toAdd = false
+				}
+			}
+			if toAdd {
+				txsForNextBlock = append(txsForNextBlock, f)
+			}
+		}
+	}
+	b.txsPool = txsForNextBlock
+	b.txsPoolMutex.Unlock()
 
-    b.printBlockchain(blockHashStr)
+	b.printBlockchain(blockHashStr)
 }
 
 func (b *Blockchain) forkLength(blockHash string) uint64 {
-    currentHash := blockHash
-    var length uint64 = 0
+	currentHash := blockHash
+	var length uint64 = 0
 
-    b.blocksMutex.Lock()
-    for {
-        block, isPresent := b.blocks[currentHash]
-        if !isPresent {
-            break
-        }
+	b.blocksMutex.Lock()
+	for {
+		block, isPresent := b.blocks[currentHash]
+		if !isPresent {
+			break
+		}
 
-        length += 1
-        currentHash = block.PrevHashStr()
-    }
+		length += 1
+		currentHash = block.PrevHashStr()
+	}
 
-    b.blocksMutex.Unlock()
-    return length
+	b.blocksMutex.Unlock()
+	return length
 }
 
 func (b *Blockchain) computeNbBlocksRewind(newHeadHash, oldHeadHash string) int {
-    rewind := 0
+	rewind := 0
 
-    newHeadHashCurrent := newHeadHash
-    oldHeadHashCurrent := oldHeadHash
+	newHeadHashCurrent := newHeadHash
+	oldHeadHashCurrent := oldHeadHash
 
-    for {
-        b.blocksMutex.Lock()
-        new, _ := b.blocks[newHeadHashCurrent]
-        old, isNotGenesis := b.blocks[oldHeadHashCurrent]
-        b.blocksMutex.Unlock()
-        oldHash := old.Hash()
-        if !isNotGenesis || bytes.Equal(oldHash[:], new.PrevHash[:]) {
-            break
-        }
-        rewind += 1
+	for {
+		b.blocksMutex.Lock()
+		new, _ := b.blocks[newHeadHashCurrent]
+		old, isNotGenesis := b.blocks[oldHeadHashCurrent]
+		b.blocksMutex.Unlock()
+		oldHash := old.Hash()
+		if !isNotGenesis || bytes.Equal(oldHash[:], new.PrevHash[:]) {
+			break
+		}
+		rewind += 1
 
-        newHeadHashCurrent = new.PrevHashStr()
-        oldHeadHashCurrent = old.PrevHashStr()
-    }
-    return rewind
+		newHeadHashCurrent = new.PrevHashStr()
+		oldHeadHashCurrent = old.PrevHashStr()
+	}
+	return rewind
 }
 
 func (b *Blockchain) printBlockchain(headHash string) {
-    currentHash := headHash
-    chainStr := ""
+	currentHash := headHash
+	chainStr := ""
 
-    b.blocksMutex.RLock()
-    for {
-        block, isPresent := b.blocks[currentHash]
-        if !isPresent {
-            break
-        }
+	b.blocksMutex.RLock()
+	for {
+		block, isPresent := b.blocks[currentHash]
+		if !isPresent {
+			break
+		}
 
-        chainStr += " " + block.String()
-        currentHash = block.PrevHashStr()
-    }
-    b.blocksMutex.RUnlock()
+		chainStr += "\n" + block.String()
+		currentHash = block.PrevHashStr()
+	}
+	b.blocksMutex.RUnlock()
 
-    fmt.Println("CHAIN" + chainStr)
+	fmt.Println("⛓ CHAIN" + chainStr + "\n")
+}
+
+func (b *Blockchain) printAssetsOwnership() {
+	toPrint := ""
+	b.assetsMutex.Lock()
+	for assetName, asset := range b.assets {
+		toPrint += assetName + ":"
+		for ownerName, amount := range asset {
+			toPrint += "\n---" + ownerName + ": " + strconv.Itoa(int(amount))
+		}
+		toPrint += "\n"
+	}
+	b.assetsMutex.Unlock()
+
+	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
 }
 
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {
-    gp := model.GossipPacket{TxPublish: tp}
-    go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
+	gp := model.GossipPacket{TxPublish: tp}
+	go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
 }
 
 func (b *Blockchain) broadcastTxPublishDecrementingHopLimit(tp *model.TxPublish) {
-    // If HopLimit is > 1 decrement and broadcast
-    if tp.HopLimit > 1 {
-        tp.HopLimit -= 1
-        b.broadcastTxPublish(tp)
-    }
+	// If HopLimit is > 1 decrement and broadcast
+	if tp.HopLimit > 1 {
+		tp.HopLimit -= 1
+		b.broadcastTxPublish(tp)
+	}
 }
 
 func (b *Blockchain) broadcastBlockPublish(bp *model.BlockPublish) {
-    gp := model.GossipPacket{BlockPublish: bp}
-    go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
+	gp := model.GossipPacket{BlockPublish: bp}
+	go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
 }
 
 func (b *Blockchain) broadcastBlockPublishDecrementingHopLimit(bp *model.BlockPublish) {
-    // If HopLimit is > 1 decrement and broadcast
-    if bp.HopLimit > 1 {
-        bp.HopLimit -= 1
-        b.broadcastBlockPublish(bp)
-    }
+	// If HopLimit is > 1 decrement and broadcast
+	if bp.HopLimit > 1 {
+		bp.HopLimit -= 1
+		b.broadcastBlockPublish(bp)
+	}
 }
 
 func (b *Blockchain) SendFileTx(file *model.File) {
-    tx := model.Transaction{
-        File: file,
-    }
-    b.SendTxPublish(&tx)
+	tx := model.Transaction{
+		File: file,
+	}
+	b.SendTxPublish(&tx)
+}
+
+func (b *Blockchain) SendShareTx(asset, to string, amount uint64) {
+	shareTx := model.ShareTx{
+		Asset: asset,
+		Amount: amount,
+		From: "",
+		To: to,
+	}
+
+	if b.gossiper.Name != to {
+		shareTx.From = b.gossiper.Name
+	}
+
+	shareTx.GenerateNonce()
+
+	tx := model.Transaction{
+		ShareTx: &shareTx,
+	}
+	b.SendTxPublish(&tx)
 }
 
 func (b *Blockchain) SendTxPublish(tx *model.Transaction) {
-    tp := model.TxPublish{
-        Transaction: *tx,
-        HopLimit: 10,
-    }
 
-    // Add the transaction to the pool of transactions to be added in the next block
-    b.addTxToPool(tx)
+	tp := model.TxPublish{
+		Transaction: *tx,
+		HopLimit:    10,
+	}
 
-    b.broadcastTxPublish(&tp)
+	// Add the transaction to the pool of transactions to be added in the next block
+
+    b.addTxToPool(*tx)
+
+	b.broadcastTxPublish(&tp)
 }
 
 func (b *Blockchain) StartMining() {
-    time.Sleep(GENESIS_BLOCK_WAIT_TIME * time.Second)
+	time.Sleep(GENESIS_BLOCK_WAIT_TIME * time.Second)
 
-    for {
-        b.txsPoolMutex.Lock()
-        txsForNextBlockLength := len(b.txsPool)
-        b.txsPoolMutex.Unlock()
+	for {
+		b.txsPoolMutex.Lock()
+		txsForNextBlockLength := len(b.txsPool)
+		b.txsPoolMutex.Unlock()
 
-        if txsForNextBlockLength > 0 {
-            //debug.Debug("START MINING " + time.Now().String())
+		if txsForNextBlockLength > 0 {
+			//debug.Debug("START MINING " + time.Now().String())
 
-            block := b.createBlockAndMine()
-            if block != nil {
-                bp := &model.BlockPublish{
-                    Block: *block,
-                    HopLimit: 20,
-                }
+			block := b.createBlockAndMine()
+			if block != nil {
+				bp := &model.BlockPublish{
+					Block:    *block,
+					HopLimit: 20,
+				}
 
-                b.HandlePktBlockPublish(&model.GossipPacket{BlockPublish: bp})
-            }
-        } else {
-            // Wait a bit before checking again
-            time.Sleep(1 * time.Second)
-        }
-    }
+				b.HandlePktBlockPublish(&model.GossipPacket{BlockPublish: bp})
+			}
+		} else {
+			// Wait a bit before checking again
+			time.Sleep(1 * time.Second)
+		}
+	}
 
 }
 
 func (b *Blockchain) createBlockAndMine() *model.Block {
-    var nonce [32]byte
-    for {
-        var prevHash [32]byte = [32]byte{}
 
-        b.forksMutex.Lock()
-        longestChainLength := b.forks[b.longestChain]
-        b.forksMutex.Unlock()
+	var nonce [32]byte
+	for {
+		var prevHash [32]byte = [32]byte{}
 
-        if longestChainLength > 0 {
-            data, _ := hex.DecodeString(b.longestChain)
-            copy(prevHash[:], data[:32])
-        }
+		b.forksMutex.Lock()
+		longestChainLength := b.forks[b.longestChain]
+		b.forksMutex.Unlock()
 
-        // Prepare transactions to insert in the block
-        b.txsPoolMutex.Lock()
-        // Stop mining if there are no more transaction  to be added to the blockchain
-        if len(b.txsPool) == 0 {
-            b.txsPoolMutex.Unlock()
-            return nil
-        }
+		if longestChainLength > 0 {
+			data, _ := hex.DecodeString(b.longestChain)
+			copy(prevHash[:], data[:32])
+		}
 
-        transactions := make([]model.Transaction, len(b.txsPool))
-        copy(transactions[:], b.txsPool)
-        b.txsPoolMutex.Unlock()
+		// Prepare transactions to insert in the block
+		b.txsPoolMutex.Lock()
+		// Stop mining if there are no more transaction  to be added to the blockchain
+		if len(b.txsPool) == 0 {
+			b.txsPoolMutex.Unlock()
+			return nil
+		}
 
-        // Create the block with a random nonce
-        rand.Read(nonce[:])
-        block := model.Block{
-            PrevHash: prevHash,
-            Nonce: nonce,
-            Transactions: transactions,
-        }
+		transactions := make([]model.Transaction, len(b.txsPool))
+		copy(transactions[:], b.txsPool)
+		b.txsPoolMutex.Unlock()
 
-        if block.IsValid() {
-            fmt.Println("FOUND-BLOCK " + block.HashStr())
+		// Create the block with a random nonce
+		rand.Read(nonce[:])
+		block := model.Block{
+			PrevHash:     prevHash,
+			Nonce:        nonce,
+			Transactions: transactions,
+		}
 
-            // Remove transactions mined from the txsForNextBlock (assume that there are no new TxPhublish added in the middle of the list)
-            b.txsPoolMutex.Lock()
-            b.txsPool = b.txsPool[len(transactions):len(b.txsPool)]
-            b.txsPoolMutex.Unlock()
+		if block.IsValid() {
+			fmt.Println("FOUND-BLOCK " + block.HashStr() + "\n")
 
-            return &block
-        }
+			// Remove transactions mined from the txsForNextBlock (assume that there are no new TxPhublish added in the middle of the list)
+			b.txsPoolMutex.Lock()
+			b.txsPool = b.txsPool[len(transactions):len(b.txsPool)]
+			b.txsPoolMutex.Unlock()
+
+			return &block
+		}
+	}
+}
+
+func (b *Blockchain) SendIdentityTx(identityName string) {
+    b.identitiesMutex.Lock()
+    _, isThere := b.identities[identityName]
+    b.identitiesMutex.Unlock()
+    if isThere {
+        fmt.Printf("❗️ Cannot add the identity \"%v\" because already claimed \n\n", identityName)
+        return
     }
+
+
+    newIdentity := &model.Identity{
+		Name: identityName,
+	}
+
+	var privateKey *rsa.PrivateKey
+
+
+	// Identity for THIS peer
+	if identityName == b.gossiper.Name {
+		privateKey = b.gossiper.PrivateKey
+		newIdentity.SetPublicKey(&privateKey.PublicKey)
+	} else {
+        // Identity for ANOTHER peer
+		privateKey = NewPrivateKey()
+		newIdentity.SetPublicKey(&privateKey.PublicKey)
+	}
+
+	fmt.Printf("👤 New Identity - Name: %v \n", identityName)
+	//fmt.Printf("PrivateKey: Private Exponent=%v\n Prime factors=%v \n", privateKey.D, privateKey.Primes)
+	//fmt.Printf("PublicKey: Modulus=%v\n Public Exponent=%v \n", newIdentity.PublicKey.N, newIdentity.PublicKey.E)
+
+    // the first 25 chars are always the same
+    fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
+
+    // the first 19 chars are always the same
+    fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
+
+
+	tx := model.Transaction{
+		Identity: newIdentity,
+	}
+	b.SendTxPublish(&tx)
 }
