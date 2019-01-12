@@ -88,4 +88,4 @@ Chain of 3 peers A<->B<->C
 
 
 # TODO
-Check new branch crypto
+Check new branch signing
