@@ -121,7 +121,7 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
     b.broadcastTxPublishDecrementingHopLimit(tp)
 }
 
-//RAF: MODIF FOR VOTATION
+
 func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg string) {
     errorMsg = ""
     isValid = true
@@ -401,7 +401,25 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
             case tx.Identity != nil:
 
                 // TODO
-
+				
+			case tx.VotationAnswerWrapper != nil:
+				vawCopy := tx.VotationAnswerWrapper.Copy()
+				questionId := vawCopy.GetVotationId()
+				b.voteAnswersMutex.Lock()
+				answers, answersExist := b.voteAnswers[questionId]
+				if !answersExist {
+					answers = make(map[string]*model.VotationAnswerWrapper)
+				}
+				answers[vawCopy.Replier] = &vawCopy
+				//I could decrypt here if you want.
+				b.voteAnswersMutex.Unlock()
+				
+			case tx.VotationStatement != nil:
+				vsCopy := tx.VotationStatement.Copy()
+				questionId := vsCopy.GetId()
+				b.voteStatementMutex.Lock()
+				b.voteStatement[questionId] = &vsCopy
+				b.voteStatementMutex.Unlock()
         }
     }
 }

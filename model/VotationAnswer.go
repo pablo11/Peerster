@@ -9,6 +9,7 @@ import (
     "crypto/cipher"
     "github.com/dedis/protobuf"
 	"io"
+	"errors"
 )
 
 //======================VOTATION ANSWER WRAPPED=========================
@@ -108,3 +109,35 @@ func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
     return gcm.Seal(nonce, nonce, va_encoded, nil), nil
 }
 
+func decrypt(ciphertext []byte, key []byte) (VotationAnswer, error) {
+	var va_decoded VotationAnswer
+	
+    c, err := aes.NewCipher(key)
+    if err != nil {
+        return va_decoded, err
+    }
+
+    gcm, err := cipher.NewGCM(c)
+    if err != nil {
+        return va_decoded, err
+    }
+
+	//THIS COULD PROBABLY FAIL BE CAREFUL !
+    nonceSize := gcm.NonceSize()
+    if len(ciphertext) < nonceSize {
+        return va_decoded, errors.New("ciphertext too short")
+    }
+
+    nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+    
+	byte_decoded, err := gcm.Open(nil, nonce, ciphertext, nil)
+	
+	if err != nil {
+		return va_decoded, err
+	}
+	
+	va_decoded = VotationAnswer{}
+    err = protobuf.Decode(byte_decoded, &va_decoded)
+	
+	return va_decoded,err
+}
