@@ -8,7 +8,9 @@ import (
     "net/http"
     "strings"
     "strconv"
+	"log"
     "encoding/base64"
+	"encoding/hex"
     "github.com/pablo11/Peerster/gossip"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/validator"
@@ -304,20 +306,33 @@ func (a *ApiHandler) VotationCreate(w http.ResponseWriter, r *http.Request) {
     }
 	
 	//Check for correctness will be done in votation
-	 go a.gossiper.launchVotation(question[0],asset[0])
+	 go a.gossiper.LaunchVotation(question[0],asset[0])
 }
 
 func (a *ApiHandler) Votations(w http.ResponseWriter, r *http.Request) {
 	
-	a.gossiper.blockchain.voteStatementMutex.Lock()
-	voteStatements := a.gossiper.blockchain.voteStatement //Is lock here enought because after we iterate...
-	a.gossiper.blockchain.voteStatementMutex.Unlock()
+	a.gossiper.Blockchain.VoteStatementMutex.Lock()
+	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
+	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
+	a.gossiper.Blockchain.AssetsMutex.Lock()
+	assetsMap := a.gossiper.Blockchain.Assets //Same here
+	a.gossiper.Blockchain.AssetsMutex.Unlock()
 	
-	jsonFiles := make([]string, len(voteStatements))
-	i:=0
+	
+	var jsonFiles []string
+
 	for asset,vs := range voteStatements {
-		jsonFiles[i] = "{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\"}"
-		i++
+		haveTheAsset := false
+		//Only send question for assets you have
+		for shareholders,shares := range assetsMap[asset] {
+			if shareholders == a.gossiper.Name && shares > 0{
+				haveTheAsset = true
+			}
+		}
+		
+		if haveTheAsset {
+			jsonFiles = append(jsonFiles,"{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\"}")
+		}
 	}
 	
 	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
@@ -342,11 +357,66 @@ func (a *ApiHandler) VotationReply(w http.ResponseWriter, r *http.Request) {
         return
     }
 	
+	answer_bool, err := strconv.ParseBool(answer[0])
+	if err != nil {
+		w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+	}
+	
 	//Check for correctness will be done in votation
-	 go a.gossiper.answerVotation(question[0], asset[0], origin[0], answer[0])
+	 go a.gossiper.AnswerVotation(question[0], asset[0], origin[0], answer_bool)
 }
 
 func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
 	
-	//TODO (reply only answer for one votating or for all voting??)
+	//reply only answers for votating I'm in
+	
+	a.gossiper.Blockchain.VoteStatementMutex.Lock()
+	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
+	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
+	a.gossiper.Blockchain.AssetsMutex.Lock()
+	assetsMap := a.gossiper.Blockchain.Assets //Same here
+	a.gossiper.Blockchain.AssetsMutex.Unlock()
+	a.gossiper.Blockchain.VoteAnswersMutex.Lock()
+	voteAnswers := a.gossiper.Blockchain.VoteAnswers //Same here
+	a.gossiper.Blockchain.VoteAnswersMutex.Unlock()
+	
+	var jsonFiles []string
+	
+	for asset,vs := range voteStatements {
+		haveTheAsset := false
+		//Only send question for assets you have
+		for shareholders,shares := range assetsMap[asset] {
+			if shareholders == a.gossiper.Name && shares > 0{
+				haveTheAsset = true
+			}
+		}
+		
+		if haveTheAsset {
+			question_id := vs.GetId()
+			holderNames, votationAnswerExists := voteAnswers[question_id]
+			a.gossiper.QuestionKeyMutex.Lock()
+			key, keyExists := a.gossiper.QuestionKey[question_id]
+			a.gossiper.QuestionKeyMutex.Unlock()
+			if votationAnswerExists && keyExists{
+				for holderName, answer := range holderNames{
+					key_byte, err := hex.DecodeString(key)
+					if err != nil{
+						log.Fatal("Error occured when decoding key")
+						break
+					}
+					ans_decrypted, err := answer.Decrypt(key_byte)
+					if err != nil{
+						log.Fatal("Error occured when decrypting answer")
+						break
+					}
+					bool_str := strconv.FormatBool(ans_decrypted.Answer)
+					jsonFiles = append(jsonFiles,"{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\", \"replier\":\"" + holderName +"\", \"answer\":\"" + bool_str +"\"}")
+				}
+			}
+		}
+	}
+	
+	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
 }

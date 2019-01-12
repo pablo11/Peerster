@@ -36,16 +36,16 @@ type Blockchain struct {
 
 	
 	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: *VotationStatement]
-    voteStatement map[string]*model.VotationStatement
-    voteStatementMutex sync.Mutex
+    VoteStatement map[string]*model.VotationStatement
+    VoteStatementMutex sync.Mutex
 	
 	// Mapping of votation_id to array of VotationReplyWrapped in the blockchain [votation_id: string => [holderName: string => votationAnswerWrapper: *VotationAnswerWrapper]]
-	voteAnswers map[string]map[string]*model.VotationAnswerWrapper
-	voteAnswersMutex sync.Mutex
+	VoteAnswers map[string]map[string]*model.VotationAnswerWrapper
+	VoteAnswersMutex sync.Mutex
 
     // Mapping of assets to users holdings: [assetName: string => [holderName: string => amount: uint64]]
-    assets map[string]map[string]uint64
-    assetsMutex sync.Mutex
+    Assets map[string]map[string]uint64
+    AssetsMutex sync.Mutex
 
 }
 
@@ -68,14 +68,14 @@ func NewBlockchain() *Blockchain {
         identities: make(map[string]*model.Identity),
         identitiesMutex: sync.Mutex{},
 		
-		voteStatement: make(map[string]*model.VotationStatement),
-        voteStatementMutex: sync.Mutex{},
+		VoteStatement: make(map[string]*model.VotationStatement),
+        VoteStatementMutex: sync.Mutex{},
 		
-		voteAnswers: make(map[string]map[string]*model.VotationAnswerWrapper),
-        voteAnswersMutex: sync.Mutex{},
+		VoteAnswers: make(map[string]map[string]*model.VotationAnswerWrapper),
+        VoteAnswersMutex: sync.Mutex{},
 
-        assets: make(map[string]map[string]uint64),
-        assetsMutex: sync.Mutex{},
+        Assets: make(map[string]map[string]uint64),
+        AssetsMutex: sync.Mutex{},
 
     }
 }
@@ -152,9 +152,9 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 
 
             // Check if the asset already exists
-            b.assetsMutex.Lock()
-            asset, assetExists := b.assets[tx.ShareTx.Asset]
-            b.assetsMutex.Unlock()
+            b.AssetsMutex.Lock()
+            asset, assetExists := b.Assets[tx.ShareTx.Asset]
+            b.AssetsMutex.Unlock()
 
             if assetExists && asset[tx.ShareTx.From] < tx.ShareTx.Amount {
                 errorMsg = tx.ShareTx.From + " doesn't have enough " + tx.ShareTx.Asset
@@ -196,9 +196,9 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			//1.
 			questionId := tx.VotationAnswerWrapper.GetVotationId()
 			
-			b.voteStatementMutex.Lock()
-			_, votationExist := b.voteStatement[questionId]
-			b.voteStatementMutex.Unlock()
+			b.VoteStatementMutex.Lock()
+			_, votationExist := b.VoteStatement[questionId]
+			b.VoteStatementMutex.Unlock()
 			
 			if !votationExist{
 				errorMsg = "The votation "+questionId+" does not exists"
@@ -207,9 +207,9 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			}
 			
 			//2.
-			b.assetsMutex.Lock()
-			asset, assetExists := b.assets[tx.VotationAnswerWrapper.AssetName]
-			b.assetsMutex.Unlock()
+			b.AssetsMutex.Lock()
+			asset, assetExists := b.Assets[tx.VotationAnswerWrapper.AssetName]
+			b.AssetsMutex.Unlock()
 			
 			if !assetExists{
 				errorMsg = "The asset "+ tx.VotationAnswerWrapper.AssetName +" doesn't exist"
@@ -225,13 +225,13 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			}
 			
 			//3.
-			b.voteAnswersMutex.Lock()
-			voteAnswer, voteAnswerExists := b.voteAnswers[questionId]
+			b.VoteAnswersMutex.Lock()
+			voteAnswer, voteAnswerExists := b.VoteAnswers[questionId]
 			var replierAlreadyAnswer bool
 			if voteAnswerExists {
 				_,replierAlreadyAnswer = voteAnswer[tx.VotationAnswerWrapper.Replier]
 			}
-			b.voteAnswersMutex.Unlock()
+			b.VoteAnswersMutex.Unlock()
 			
 			if replierAlreadyAnswer {
 				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" already answer this question"
@@ -251,9 +251,9 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			//1.
 			questionId := tx.VotationStatement.GetId()
 			
-			b.voteStatementMutex.Lock()
-			_, votationExist := b.voteStatement[questionId]
-			b.voteStatementMutex.Unlock()
+			b.VoteStatementMutex.Lock()
+			_, votationExist := b.VoteStatement[questionId]
+			b.VoteStatementMutex.Unlock()
 			
 			if votationExist{
 				errorMsg = "The votation "+questionId+" already exists"
@@ -262,9 +262,9 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			}
 			
 			//2.
-			b.assetsMutex.Lock()
-			asset, assetExists := b.assets[tx.VotationStatement.AssetName]
-			b.assetsMutex.Unlock()
+			b.AssetsMutex.Lock()
+			asset, assetExists := b.Assets[tx.VotationStatement.AssetName]
+			b.AssetsMutex.Unlock()
 			
 			if !assetExists{
 				errorMsg = "The asset "+ tx.VotationStatement.AssetName +"doesn't exist"
@@ -407,21 +407,21 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 			case tx.VotationAnswerWrapper != nil:
 				vawCopy := tx.VotationAnswerWrapper.Copy()
 				questionId := vawCopy.GetVotationId()
-				b.voteAnswersMutex.Lock()
-				answers, answersExist := b.voteAnswers[questionId]
+				b.VoteAnswersMutex.Lock()
+				answers, answersExist := b.VoteAnswers[questionId]
 				if !answersExist {
 					answers = make(map[string]*model.VotationAnswerWrapper)
 				}
 				answers[vawCopy.Replier] = &vawCopy
 				//I could decrypt here if you want.
-				b.voteAnswersMutex.Unlock()
+				b.VoteAnswersMutex.Unlock()
 				
 			case tx.VotationStatement != nil:
 				vsCopy := tx.VotationStatement.Copy()
 				questionId := vsCopy.GetId()
-				b.voteStatementMutex.Lock()
-				b.voteStatement[questionId] = &vsCopy
-				b.voteStatementMutex.Unlock()
+				b.VoteStatementMutex.Lock()
+				b.VoteStatement[questionId] = &vsCopy
+				b.VoteStatementMutex.Unlock()
         }
     }
 }

@@ -62,6 +62,51 @@ func (vaw *VotationAnswerWrapper) GetVotationId() string{
 	return hex.EncodeToString(new_vs.Hash())
 }
 
+func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
+	debug.Debug("Trying to decrypt votationAnswer with symmetric key")
+	
+	ciphertext := vaw.Answer
+	
+	var va_decoded VotationAnswer
+	
+    c, err := aes.NewCipher(key)
+    if err != nil {
+        return va_decoded, err
+    }
+
+    gcm, err := cipher.NewGCM(c)
+    if err != nil {
+        return va_decoded, err
+    }
+
+	//THIS COULD PROBABLY FAIL BE CAREFUL !
+    nonceSize := gcm.NonceSize()
+    if len(ciphertext) < nonceSize {
+		debug.Debug("Votation Answer cipher text too short")
+        return va_decoded, errors.New("ciphertext too short")
+    }
+
+    nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+    
+	byte_decoded, err := gcm.Open(nil, nonce, ciphertext, nil)
+	
+	if err != nil {
+		return va_decoded, err
+	}
+	
+	va_decoded = VotationAnswer{}
+    err = protobuf.Decode(byte_decoded, &va_decoded)
+	
+	if err != nil {
+		debug.Debug("Votation Answer didn't deserialized with protobuf")
+        return va_decoded, err
+    }
+	
+	debug.Debug("Decryption votation Answer worked!")
+	
+	return va_decoded,err
+}
+
 //=========================VOTATION ANSWER================================
 type VotationAnswer struct{
 	Answer		bool
@@ -111,45 +156,4 @@ func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
     return gcm.Seal(nonce, nonce, va_encoded, nil), nil
 }
 
-func decrypt(ciphertext []byte, key []byte) (VotationAnswer, error) {
-	debug.Debug("Trying to decrypt votationAnswer with symmetric key")
 
-	var va_decoded VotationAnswer
-	
-    c, err := aes.NewCipher(key)
-    if err != nil {
-        return va_decoded, err
-    }
-
-    gcm, err := cipher.NewGCM(c)
-    if err != nil {
-        return va_decoded, err
-    }
-
-	//THIS COULD PROBABLY FAIL BE CAREFUL !
-    nonceSize := gcm.NonceSize()
-    if len(ciphertext) < nonceSize {
-		debug.Debug("Votation Answer cipher text too short")
-        return va_decoded, errors.New("ciphertext too short")
-    }
-
-    nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-    
-	byte_decoded, err := gcm.Open(nil, nonce, ciphertext, nil)
-	
-	if err != nil {
-		return va_decoded, err
-	}
-	
-	va_decoded = VotationAnswer{}
-    err = protobuf.Decode(byte_decoded, &va_decoded)
-	
-	if err != nil {
-		debug.Debug("Votation Answer didn't deserialized with protobuf")
-        return va_decoded, err
-    }
-	
-	debug.Debug("Decryption votation Answer worked!")
-	
-	return va_decoded,err
-}

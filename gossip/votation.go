@@ -9,7 +9,7 @@ import (
 	"github.com/pablo11/Peerster/util/debug"
 )
 
-func (g *Gossiper) launchVotation(question string, assetName string){
+func (g *Gossiper) LaunchVotation(question string, assetName string){
 	//Create and put TxVotationStatement in pending Blocks
 	//Send symmetric key to all peers 
 		//What would be the message kind?
@@ -46,26 +46,26 @@ func (g *Gossiper) launchVotation(question string, assetName string){
 	
 	var peers []string
 	//Send to all shareholders
-	g.Blockchain.assetsMutex.Lock()
-	for p,_ := range g.Blockchain.assets[assetName]{
+	g.Blockchain.AssetsMutex.Lock()
+	for p,_ := range g.Blockchain.Assets[assetName]{
 		peers = append(peers, p) //Assume that peer with asset 0 have been removed
 	}
-	g.Blockchain.assetsMutex.Unlock()
+	g.Blockchain.AssetsMutex.Unlock()
 	
 	debug.Debug("Sending symmetric to all peers")
 	g.sendKeyToAllPeers(peers,key_str,vs.GetId())
 	
 }
 
-func (g *Gossiper) answerVotation(question string, assetName string, origin string, answer bool){
+func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
 	//Get question corresponding to votation_id
 	debug.Debug("Answering vote question")
 	
-	votation_id := model.GetVotationId(question,assetName,origin)
+	votation_id := model.GetVotationId(question_subject,assetName,origin)
 	
-	g.Blockchain.voteStatementMutex.Lock()
-	question, questionExist := g.Blockchain.voteStatement[votation_id]
-	g.Blockchain.voteStatementMutex.Unlock()
+	g.Blockchain.VoteStatementMutex.Lock()
+	question, questionExist := g.Blockchain.VoteStatement[votation_id]
+	g.Blockchain.VoteStatementMutex.Unlock()
 	
 	if !questionExist{
 		log.Fatal("the question you'r trying to answer does not exist")
