@@ -8,7 +8,7 @@ import (
     "math/rand"
     "encoding/hex"
     "github.com/pablo11/Peerster/model"
-    //"github.com/pablo11/Peerster/util/debug"
+    "github.com/pablo11/Peerster/util/debug"
 )
 
 type Blockchain struct {
@@ -70,13 +70,6 @@ func (b *Blockchain) SetGossiper(g *Gossiper) {
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
     tp := gp.TxPublish
 
-    // Validate signature
-    if tp.Transaction.Signature != nil {
-
-        // TODO: validate signature (get the public key of the identity with name tp.Transaction.Signature.Origin and call the IsValid method of Signature)
-
-    }
-
     // Discard transactions that is already in the pool
     txAlreadyInPool := false
     b.txsPoolMutex.Lock()
@@ -127,37 +120,119 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
             // TODO: implement
 
         case tx.ShareTx != nil:
+            // Check if the two identities in the share transaction are in the blockchain and that the transaction is validly signed by the sender of the transaction
+            isValid, errorMsg = b.isShareTxValidlySigned(tx.ShareTx)
+    }
+    return
+}
 
+func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, errorMsg string) {
+    errorMsg = ""
+    isValid = true
 
-            // TODO: make sure that the destinatary of the transaction is in the blockchain identities.
-            // Also make sure that the transaction is signed by the private key corresponding to the public key claimed by the from name
+    // Make sure that the sender (From) and destinatary (To) identities are in the blockchain
+    b.identitiesMutex.Lock()
+    _ /*fromIdentity*/, isFromRegistered := b.identities[st.From]
+    _ /*toIdentity*/, isToRegistered := b.identities[st.To]
+    b.identitiesMutex.Unlock()
+    if !isFromRegistered || !isToRegistered {
+        errorMsg = "No identities found for the share transaction"
+        isValid = false
+        return
+    }
 
+    // Validate signature with the identity of the sender (From)
 
-            // Check if the asset already exists
+    isValidSignature := true // TODO: need to check the signature against the sender identity
+
+    if !isValidSignature {
+        errorMsg = "Invalid signature of share transaction"
+        isValid = false
+        return
+    }
+
+    return
+}
+
+// This function assumes that the ShareTxs's signature contained in the list of transactions are already validated
+// To simplify the implementation, the order of thransactions in the block must be valid to be accepted
+func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
+    tmpAssets := make(map[string]map[string]uint64)
+
+    for _, tx := range txs {
+        if tx.ShareTx != nil {
             b.assetsMutex.Lock()
             asset, assetExists := b.assets[tx.ShareTx.Asset]
             b.assetsMutex.Unlock()
 
-            if assetExists && asset[tx.ShareTx.From] < tx.ShareTx.Amount {
-                errorMsg = tx.ShareTx.From + " doesn't have enough " + tx.ShareTx.Asset
-                isValid = false
-                return
-            }
-
-            /*
             if assetExists {
+                // Check if sender has sufficeint balance
+                _, tmpAssetPresent := tmpAssets[tx.ShareTx.Asset]
+                if !tmpAssetPresent {
+                    // The asset doesn't exist in our temporary version of the assets, get the user balance from
+                    fromBalance, fromBalanceExists := asset[tx.ShareTx.From]
+                    if !fromBalanceExists {
+                        debug.Debug("Discarding block: invalid asset transaction")
+                        return false
+                    }
+                    tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] = fromBalance
 
-                // TODO: make sure Fom and To are present in the asset shares mapping
+                    toBalance, toBalanceExists := asset[tx.ShareTx.To]
+                    if !toBalanceExists {
+                        toBalance = 0
+                    }
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = toBalance
+                }
 
-                // The asset exists, we need to do a transaction from one holder to another
+                fromAmount, fromAmountNonzero := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From]
+                if !fromAmountNonzero || fromAmount < tx.ShareTx.Amount {
+                    debug.Debug("Discarding block: invalid asset transaction")
+                    return false
+                } else {
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] -= tx.ShareTx.Amount
+                    if tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] == 0 {
+                        delete(tmpAssets[tx.ShareTx.Asset], tx.ShareTx.From)
+                    }
+
+                    _, toAmountExists := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To]
+                    if toAmountExists {
+                        tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] += tx.ShareTx.Amount
+                    } else {
+                        tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+                    }
+                }
+            } else {
+                // Create the new asset
+                tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
+                tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+            }
+        }
+    }
+    return true
+}
+
+// This function assumes that the transaction and it's content is already validated (identities existence, valid signature, prevent doublespending)
+func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
+    for _, tx := range txs {
+        if tx.ShareTx != nil {
+            b.assetsMutex.Lock()
+            asset, assetExists := b.assets[tx.ShareTx.Asset]
+            b.assetsMutex.Unlock()
+            if assetExists {
+                // The asset exists, we need to do a transaction from the sender to the destinatary (is the sender has sufficient balance)
                 if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
                     // The holder doesn't have enough to asset to perform the transaction
-
-
+                    fmt.Println("ShareTx discarded since the sender doesn't have a sufficient balance")
                 } else {
                     b.assetsMutex.Lock()
                     asset[tx.ShareTx.From] -= tx.ShareTx.Amount
-                    asset[tx.ShareTx.To] += tx.ShareTx.Amount
+                    _, destinataryHashShares := asset[tx.ShareTx.To]
+                    if destinataryHashShares {
+                        asset[tx.ShareTx.To] += tx.ShareTx.Amount
+                    } else {
+                        asset[tx.ShareTx.To] = tx.ShareTx.Amount
+                    }
                     b.assetsMutex.Unlock()
                 }
             } else {
@@ -167,10 +242,11 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
                 b.assets[tx.ShareTx.Asset][tx.ShareTx.From] = tx.ShareTx.Amount
                 b.assetsMutex.Unlock()
             }
-            //*/
+        }
     }
-    return
 }
+
+
 
 func (b *Blockchain) addTxToPool(t model.Transaction) {
     // Add only if not already there
@@ -217,6 +293,13 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
             fmt.Println("Invalid transaction: " + errorMsg)
             return
         }
+    }
+
+    // Validate transactions of type ShareTx
+    validTxShares := b.validateBlockShareTxs(bp.Block.Transactions)
+    if !validTxShares {
+        fmt.Println("Invalid asset transactions")
+        return
     }
 
     //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
@@ -292,6 +375,8 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 
         }
     }
+
+    b.applyShareTxs(block.Transactions)
 }
 
 func (b *Blockchain) updateLongestChain(blockHashStr string, block *model.Block) {

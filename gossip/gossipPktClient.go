@@ -31,6 +31,17 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
                 go g.StartSearchRequest(cm.Budget, cm.Keywords, false)
             }
 
+        case "shareTx":
+            tx := model.Transaction{
+                ShareTx: &model.ShareTx{
+                    Asset: cm.Asset,
+                    Amount: cm.Amount,
+                    From: g.Name,
+                    To: cm.Dest,
+                },
+            }
+            go g.Blockchain.SendTxPublish(&tx)
+
         default:
             fmt.Println("WARNING: Unoknown client message type")
     }

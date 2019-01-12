@@ -8,6 +8,8 @@ type ClientMessage struct {
     Request string
     Keywords []string
     Budget uint64
+    Asset string
+    Amount uint64
 }
 
 func (cm *ClientMessage) String() string {
