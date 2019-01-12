@@ -40,6 +40,9 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
 		case "vote":
 			go g.LaunchVotation(cm.Text,cm.Asset)
 		
+		case "voteAnswer":
+			go g.AnswerVotation(cm.Text, cm.Asset, cm.Origin, cm.Answer)
+		
         default:
             fmt.Println("WARNING: Unoknown client message type")
     }

@@ -484,6 +484,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
     b.integrateValidTxs(&bp.Block)
 
 	b.printAssetsOwnership()
+	
+	b.printVotings()
 
     // If HopLimit is > 1 decrement and broadcast
     b.broadcastBlockPublishDecrementingHopLimit(bp)
@@ -512,9 +514,13 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 				answers, answersExist := b.VoteAnswers[questionId]
 				if !answersExist {
 					answers = make(map[string]*model.VotationAnswerWrapper)
+					answers[vawCopy.Replier] = &vawCopy
+					b.VoteAnswers[questionId] = answers
+				} else {
+					answers[vawCopy.Replier] = &vawCopy
 				}
-				answers[vawCopy.Replier] = &vawCopy
-				//I could decrypt here if you want.
+				
+				
 				b.VoteAnswersMutex.Unlock()
 				
 			case tx.VotationStatement != nil:
@@ -628,6 +634,54 @@ func (b *Blockchain) printAssetsOwnership() {
 	b.AssetsMutex.Unlock()
 
 	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
+}
+
+func (b *Blockchain) printVotings() {
+	toPrint := ""
+	question_prints := make(map[string]string)
+	b.VoteStatementMutex.Lock()
+	for question_id, vs := range b.VoteStatement{
+		question_prints[question_id] = question_id + ":  " + vs.Question+ " from " +vs.Origin+" on asset "+ vs.AssetName	
+	}
+	b.VoteStatementMutex.Unlock()
+
+	question_keys_copy := make(map[string]string)
+	b.gossiper.QuestionKeyMutex.Lock()
+	for question_id, _ := range question_prints{
+		key, keyExists := b.gossiper.QuestionKey[question_id]
+		if keyExists {
+			question_keys_copy[question_id] = key
+		}
+	}
+	b.gossiper.QuestionKeyMutex.Unlock()
+	
+	b.VoteAnswersMutex.Lock()
+	for question_id, question_print := range question_prints {
+		toPrint += question_print
+		for voteReplier, vote := range b.VoteAnswers[question_id]{
+		
+			//TODO: I HAVE TO LOCK HERE
+			key, keyExists := question_keys_copy[question_id]
+			var bool_str string
+			if keyExists{
+				key_byte, err := hex.DecodeString(key)
+				
+				ans_decrypted, err := vote.Decrypt(key_byte)
+				if err != nil{
+					fmt.Println("failled to decrypt answer")
+					return
+				}
+				
+				bool_str = strconv.FormatBool(ans_decrypted.Answer)
+			}
+			toPrint += "\n---" + voteReplier +" "+ bool_str
+		}
+		toPrint += "\n"
+	}
+	
+	b.VoteAnswersMutex.Unlock()
+	
+	fmt.Println("VOTATIONS:\n" + toPrint)
 }
 
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {

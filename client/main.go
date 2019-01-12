@@ -23,6 +23,8 @@ func main() {
     identity := flag.String("identity", "", "Identity on the blockchain")
 	question := flag.String("question", "", "Question for vote")
 	assetVote:= flag.String("assetVote", "", "Asset on which vote is done")
+	origin := flag.String("origin", "", "Origin node of the vote")
+	answer := flag.Bool("answer", false, "Answer to the vote")
 
     flag.Parse()
 
@@ -98,6 +100,18 @@ func main() {
         }
     }
 	
+	if *question != "" && *assetVote != "" && *origin != ""{
+		cm := &model.ClientMessage{
+            Type: "voteAnswer",
+            Text: *question,
+            Asset: *assetVote,
+			Origin: *origin,
+			Answer: *answer,
+        }
+        sendPacket(cm, *uiPort)
+        return
+	}
+	
 	if *question != "" && *assetVote != "" {
 		cm := &model.ClientMessage{
             Type: "vote",
@@ -107,6 +121,8 @@ func main() {
         sendPacket(cm, *uiPort)
         return
 	}
+	
+	
 
     fmt.Println("Please provide some valid parameters")
 }

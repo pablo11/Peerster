@@ -2,7 +2,6 @@ package gossip
 
 import (
     "encoding/hex"
-	"log"
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
@@ -68,7 +67,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	g.Blockchain.VoteStatementMutex.Unlock()
 	
 	if !questionExist{
-		log.Fatal("the question you'r trying to answer does not exist")
+		fmt.Println("the question you'r trying to answer does not exist")
 		return
 	}
 	
@@ -81,13 +80,13 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	g.QuestionKeyMutex.Unlock()
 	
 	if !ok {
-		log.Fatal("Fail to retreive the key to answer to this question")
+		fmt.Println("Fail to retreive the key to answer to this question")
 		return
 	}
 	
 	key_byte, err := hex.DecodeString(key)
 	if err != nil{
-		log.Fatal("Cannot decode key")
+		fmt.Println("Cannot decode key")
 		return
 	}
 	
@@ -96,7 +95,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	
 	if err != nil {
 		fmt.Println("Error during symmetric encryption")
-		log.Fatal(err)
+		return
 	}
 	
 	vaw := model.VotationAnswerWrapper{
@@ -129,10 +128,12 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId string){	
 
 	for _,p := range peers{
-		pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+		if p != g.Name {
+			pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
 		
-		//ENCRYPT PRIVATE !!
-		g.SendPrivateMessage(pm)
+			//ENCRYPT PRIVATE !!
+			g.SendPrivateMessage(pm)
+		}
 	}
-	debug.Debug("Symmetric key for votation send to all shareholders")
+	debug.Debug("Sending symmetric to all peers -> OK")
 }

@@ -11,7 +11,7 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
     if gp.Private.Destination == g.Name {
         // If the private message is for this node, display it
         g.printGossipPacket("", fromAddrStr, gp)
-		
+		debug.Debug("Received private message ")
 		if checkPMWithKey(gp.Private.Text) {
 
 			key, question_id := getKeyFromPM(gp.Private.Text)
@@ -33,17 +33,19 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
 }
 
 func checkPMWithKey (msg string) bool{
-	re := regexp.MustCompile("VOTATION KEY:.{32} QUESTION ID:.{32}")
+	re := regexp.MustCompile("VOTATION KEY:.{64} QUESTION ID:.{64}")
 	if re.MatchString(msg) {
+		debug.Debug(msg + " is a votation key")
 		return true
 	}
+	debug.Debug(msg + " isn't a votation key")
 	return false
 }
 
 func getKeyFromPM (msg string) (string,string){
 	s1 := "VOTATION KEY:"
-	key := msg[len(s1):len(s1)+32]
-	questionId := msg[len(msg)-32:len(msg)]
+	key := msg[len(s1):len(s1)+64]
+	questionId := msg[len(msg)-64:len(msg)]
 	return key,questionId
 }
 
