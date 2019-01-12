@@ -21,6 +21,8 @@ func main() {
     asset := flag.String("asset", "", "Name of the asset to create or transact")
     amount := flag.Int("amount", 0, "Amount to send in an asset transaction")
     identity := flag.String("identity", "", "Identity on the blockchain")
+	question := flag.String("question", "", "Question for vote")
+	assetVote:= flag.String("assetVote", "", "Asset on which vote is done")
 
     flag.Parse()
 
@@ -95,6 +97,16 @@ func main() {
             return
         }
     }
+	
+	if *question != "" && *assetVote != "" {
+		cm := &model.ClientMessage{
+            Type: "vote",
+            Text: *question,
+            Asset: *assetVote,
+        }
+        sendPacket(cm, *uiPort)
+        return
+	}
 
     fmt.Println("Please provide some valid parameters")
 }

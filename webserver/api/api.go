@@ -8,7 +8,9 @@ import (
     "net/http"
     "strings"
     "strconv"
+	"log"
     "encoding/base64"
+	"encoding/hex"
     "github.com/pablo11/Peerster/gossip"
     "github.com/pablo11/Peerster/model"
     "github.com/pablo11/Peerster/util/validator"
@@ -290,4 +292,131 @@ func (a *ApiHandler) SearchResults(w http.ResponseWriter, r *http.Request) {
     }
 
     sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
+}
+
+func (a *ApiHandler) VotationCreate(w http.ResponseWriter, r *http.Request) {
+	//Create a votation
+	r.ParseForm()
+    question, isQuestionPresent := r.PostForm["question"]
+    asset, isAssetPresent := r.PostForm["asset"]
+    if !isQuestionPresent || len(question) < 1 || question[0] == "" || !isAssetPresent || len(asset) < 1 || asset[0] == "" {
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+	
+	//Check for correctness will be done in votation
+	 go a.gossiper.LaunchVotation(question[0],asset[0])
+}
+
+func (a *ApiHandler) Votations(w http.ResponseWriter, r *http.Request) {
+	
+	a.gossiper.Blockchain.VoteStatementMutex.Lock()
+	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
+	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
+	a.gossiper.Blockchain.AssetsMutex.Lock()
+	assetsMap := a.gossiper.Blockchain.Assets //Same here
+	a.gossiper.Blockchain.AssetsMutex.Unlock()
+	
+	
+	var jsonFiles []string
+
+	for asset,vs := range voteStatements {
+		haveTheAsset := false
+		//Only send question for assets you have
+		for shareholders,shares := range assetsMap[asset] {
+			if shareholders == a.gossiper.Name && shares > 0{
+				haveTheAsset = true
+			}
+		}
+		
+		if haveTheAsset {
+			jsonFiles = append(jsonFiles,"{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\"}")
+		}
+	}
+	
+	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
+}
+
+func (a *ApiHandler) VotationReply(w http.ResponseWriter, r *http.Request) {
+	//Create a votation reply
+	r.ParseForm()
+    question, isQuestionPresent := r.PostForm["question"]
+    asset, isAssetPresent := r.PostForm["asset"]
+	origin, isOriginPresent := r.PostForm["origin"]
+	answer, isAnswerPresent := r.PostForm["answer"]
+    if !isQuestionPresent || len(question) < 1 || question[0] == "" || !isAssetPresent || len(asset) < 1 || asset[0] == ""{
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+	
+	if !isOriginPresent || len(origin) < 1 || origin[0] == "" || !isAnswerPresent || len(answer) < 1 || answer[0] == ""{
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+	
+	answer_bool, err := strconv.ParseBool(answer[0])
+	if err != nil {
+		w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+	}
+	
+	//Check for correctness will be done in votation
+	 go a.gossiper.AnswerVotation(question[0], asset[0], origin[0], answer_bool)
+}
+
+func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
+	
+	//reply only answers for votating I'm in
+	
+	a.gossiper.Blockchain.VoteStatementMutex.Lock()
+	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
+	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
+	a.gossiper.Blockchain.AssetsMutex.Lock()
+	assetsMap := a.gossiper.Blockchain.Assets //Same here
+	a.gossiper.Blockchain.AssetsMutex.Unlock()
+	a.gossiper.Blockchain.VoteAnswersMutex.Lock()
+	voteAnswers := a.gossiper.Blockchain.VoteAnswers //Same here
+	a.gossiper.Blockchain.VoteAnswersMutex.Unlock()
+	
+	var jsonFiles []string
+	
+	for asset,vs := range voteStatements {
+		haveTheAsset := false
+		//Only send question for assets you have
+		for shareholders,shares := range assetsMap[asset] {
+			if shareholders == a.gossiper.Name && shares > 0{
+				haveTheAsset = true
+			}
+		}
+		
+		if haveTheAsset {
+			question_id := vs.GetId()
+			holderNames, votationAnswerExists := voteAnswers[question_id]
+			a.gossiper.QuestionKeyMutex.Lock()
+			key, keyExists := a.gossiper.QuestionKey[question_id]
+			a.gossiper.QuestionKeyMutex.Unlock()
+			if votationAnswerExists && keyExists{
+				for holderName, answer := range holderNames{
+					key_byte, err := hex.DecodeString(key)
+					if err != nil{
+						log.Fatal("Error occured when decoding key")
+						break
+					}
+					ans_decrypted, err := answer.Decrypt(key_byte)
+					if err != nil{
+						log.Fatal("Error occured when decrypting answer")
+						break
+					}
+					bool_str := strconv.FormatBool(ans_decrypted.Answer)
+					jsonFiles = append(jsonFiles,"{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\", \"replier\":\"" + holderName +"\", \"answer\":\"" + bool_str +"\"}")
+				}
+			}
+		}
+	}
+	
+	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
 }
