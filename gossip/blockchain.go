@@ -655,6 +655,7 @@ func (b *Blockchain) SendIdentityTx(identityName string) {
             fmt.Printf("👤 New Identity - Name: %v \n", identityName)
             fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
             fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
+            //fmt.Printf("Hash: %v \n", newIdentity.HashStr())
             b.SendTxPublish(tx)
         } else {
             fmt.Println("❗️ Cannot add the identity \"" + identityName + "\" because already in the pending pool\n")

@@ -36,7 +36,7 @@ func (t *Transaction) Hash() (out [32]byte) {
     h.Write(txContentHash[:])
     if t.Signature != nil {
         h.Write([]byte(t.Signature.Name))
-        h.Write(t.Signature.Signature)
+        h.Write(t.Signature.BitString)
     }
     copy(out[:], h.Sum(nil))
     return

@@ -17,24 +17,22 @@ func (g *Gossiper) Sign(data []byte) *model.Signature {
 
     s := &model.Signature{
         Name: g.Name,
-        Signature: make([]byte, 0),
     }
-
 
     rng := rand.Reader
 
     hashed := sha256.Sum256(data)
 
-    signature, err := rsa.SignPSS(rng, g.PrivateKey, crypto.SHA256, hashed[:], &opts)
+    bitString, err := rsa.SignPSS(rng, g.PrivateKey, crypto.SHA256, hashed[:], &opts)
     if err != nil {
             fmt.Printf("Error signing: %v\n", err)
             return nil
     }
 
-    fmt.Printf("Signature: %x\n", signature)
+    fmt.Printf("Signature bitstring: %x\n", bitString)
 
-    // TODO DEEP COPY
-    s.Signature = signature
+    s.BitString = make([]byte, len(bitString))
+    copy(s.BitString, bitString)
 
     return s
 }
@@ -43,7 +41,7 @@ func (g *Gossiper) SignFile(file *model.File) *model.Signature {
     return g.Sign(file.MetafileHash)
 }
 
-/* Useless?
+/*
 func (g *Gossiper) SignIdentity(identity *Identity) Signature {
     return g.Sign([]byte(identity.Name))
 }
@@ -83,7 +81,7 @@ func (b *Blockchain) Verify(sig model.Signature, data []byte) bool {
     }
     pub := identity.PublicKeyObj()
 
-    err := rsa.VerifyPSS(pub, crypto.SHA256, hashed[:], sig.Signature, &opts)
+    err := rsa.VerifyPSS(pub, crypto.SHA256, hashed[:], sig.BitString, &opts)
     if err != nil {
         fmt.Printf("Invalid signature: %v\n", err)
         return false
