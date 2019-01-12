@@ -238,7 +238,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 				isValid = false
 				return
 			}
-			debug.debug("Checking votation answer transaction correctness -> OK")
+			debug.Debug("Checking votation answer transaction correctness -> OK")
 		
 		case tx.VotationStatement != nil:
 			//To be rejected, a votation statement:
