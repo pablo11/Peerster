@@ -36,3 +36,12 @@ func (vs *VotationStatement) String() string {
 func (vs *VotationStatement) GetId() string{
 	return hex.EncodeToString(vs.Hash())
 }
+
+func GetVotationId(question string, assetName string, origin string) string{
+	new_vs := &VotationStatement{
+		Question: question,
+		Origin:	origin,
+		AssetName: assetName,
+	}
+	return hex.EncodeToString(new_vs.Hash())
+}

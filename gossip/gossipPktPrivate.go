@@ -3,6 +3,7 @@ package gossip
 import (
     "fmt"
     "github.com/pablo11/Peerster/model"
+	"github.com/pablo11/Peerster/util/debug"
 	"regexp"
 )
 
@@ -17,6 +18,7 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
 			g.QuestionKeyMutex.Lock()
 			g.QuestionKey[question_id] = key
 			g.QuestionKeyMutex.Unlock()
+			debug.Debug("Received a symmetric key for question "+question_id)
 		}
 		
     } else {

@@ -291,3 +291,62 @@ func (a *ApiHandler) SearchResults(w http.ResponseWriter, r *http.Request) {
 
     sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
 }
+
+func (a *ApiHandler) VotationCreate(w http.ResponseWriter, r *http.Request) {
+	//Create a votation
+	r.ParseForm()
+    question, isQuestionPresent := r.PostForm["question"]
+    asset, isAssetPresent := r.PostForm["asset"]
+    if !isQuestionPresent || len(question) < 1 || question[0] == "" || !isAssetPresent || len(asset) < 1 || asset[0] == "" {
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+	
+	//Check for correctness will be done in votation
+	 go a.gossiper.launchVotation(question[0],asset[0])
+}
+
+func (a *ApiHandler) Votations(w http.ResponseWriter, r *http.Request) {
+	
+	a.gossiper.blockchain.voteStatementMutex.Lock()
+	voteStatements := a.gossiper.blockchain.voteStatement //Is lock here enought because after we iterate...
+	a.gossiper.blockchain.voteStatementMutex.Unlock()
+	
+	jsonFiles := make([]string, len(voteStatements))
+	i:=0
+	for asset,vs := range voteStatements {
+		jsonFiles[i] = "{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\"}"
+		i++
+	}
+	
+	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
+}
+
+func (a *ApiHandler) VotationReply(w http.ResponseWriter, r *http.Request) {
+	//Create a votation reply
+	r.ParseForm()
+    question, isQuestionPresent := r.PostForm["question"]
+    asset, isAssetPresent := r.PostForm["asset"]
+	origin, isOriginPresent := r.PostForm["origin"]
+	answer, isAnswerPresent := r.PostForm["answer"]
+    if !isQuestionPresent || len(question) < 1 || question[0] == "" || !isAssetPresent || len(asset) < 1 || asset[0] == ""{
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+	
+	if !isOriginPresent || len(origin) < 1 || origin[0] == "" || !isAnswerPresent || len(answer) < 1 || answer[0] == ""{
+        w.Header().Set("Server", "Cryptop GO server")
+        w.WriteHeader(400)
+        return
+    }
+	
+	//Check for correctness will be done in votation
+	 go a.gossiper.answerVotation(question[0], asset[0], origin[0], answer[0])
+}
+
+func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
+	
+	//TODO (reply only answer for one votating or for all voting??)
+}

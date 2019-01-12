@@ -57,13 +57,20 @@ func (g *Gossiper) launchVotation(question string, assetName string){
 	
 }
 
-func (g *Gossiper) answerVotation(votation_id string, answer bool){
+func (g *Gossiper) answerVotation(question string, assetName string, origin string, answer bool){
 	//Get question corresponding to votation_id
 	debug.Debug("Answering vote question")
+	
+	votation_id := model.GetVotationId(question,assetName,origin)
+	
 	g.Blockchain.voteStatementMutex.Lock()
-	question := g.Blockchain.voteStatement[votation_id]
+	question, questionExist := g.Blockchain.voteStatement[votation_id]
 	g.Blockchain.voteStatementMutex.Unlock()
 	
+	if !questionExist{
+		log.Fatal("the question you'r trying to answer does not exist")
+		return
+	}
 	
 	va := model.VotationAnswer{
 		Answer: answer,
