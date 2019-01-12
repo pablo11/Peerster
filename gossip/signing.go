@@ -43,27 +43,27 @@ func (g *Gossiper) SignFile(file *model.File) *model.Signature {
     return g.Sign(file.MetafileHash)
 }
 
-/* Useless?
-func (g *Gossiper) SignIdentity(identity *Identity) Signature {
+// Useless?
+func (g *Gossiper) SignIdentity(identity *model.Identity) *model.Signature {
     return g.Sign([]byte(identity.Name))
 }
-
-func (g *Gossiper) SignShareTx(shareTx *ShareTx) Signature {
+/**
+func (g *Gossiper) SignShareTx(shareTx *model.ShareTx) *model.Signature {
     return g.Sign(shareTx.Hash())
 }
 
-func (g *Gossiper) SignPublishShareTx(publishShareTx *PublishShareTx) Signature {
+func (g *Gossiper) SignPublishShareTx(publishShareTx *model.PublishShareTx) *model.Signature {
     return g.Sign(publishShareTx.Hash())
-}
+}*/
 
-func (g *Gossiper) SignVotingStatement(votingStatement *VotingStatement) Signature {
+func (g *Gossiper) SignVotingStatement(votingStatement *model.VotationStatement) *model.Signature {
     return g.Sign(votingStatement.Hash())
 }
 
-func (g *Gossiper) SignVotingReply(votingReply *VotingReply) Signature {
-    return g.Sign(votingReply.Hash())
+func (g *Gossiper) SignVotationAnswerWrapper(votationAnswerWrapper *model.VotationAnswerWrapper) *model.Signature {
+    return g.Sign(votationAnswerWrapper.Hash())
 }
-*/
+
 
 
 // ===== Validation =====

@@ -26,3 +26,4 @@ func (pm *PrivateMessage) String() string {
     hopLimitStr := strconv.FormatUint(uint64(pm.HopLimit), 10)
     return "PRIVATE origin " + pm.Origin + " hop-limit " + hopLimitStr + " contents " + pm.Text
 }
+

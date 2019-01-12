@@ -10,7 +10,7 @@ type Transaction struct {
     Identity *Identity
     ShareTx *ShareTx
 	VotationStatement *VotationStatement
-    VotationAnswerWrapped *VotationAnswerWrapped
+    VotationAnswerWrapper *VotationAnswerWrapper
     Signature *Signature
 }
 
@@ -47,6 +47,8 @@ func (t *Transaction) Copy() Transaction {
     txCopy := Transaction{
         File: nil,
         Identity: nil,
+		VotationStatement: nil,
+		VotationAnswerWrapper: nil,
         Signature: nil,
         ShareTx: nil,
     }
@@ -63,6 +65,14 @@ func (t *Transaction) Copy() Transaction {
         case t.ShareTx != nil:
             shareTxCopy := t.ShareTx.Copy()
             txCopy.ShareTx = &shareTxCopy
+			
+		case t.VotationStatement != nil:
+			votationStatementCopy := t.VotationStatement.Copy()
+			txCopy.VotationStatement = &votationStatementCopy
+			
+		case t.VotationAnswerWrapper != nil:
+			VotationAnswerWrapperCopy := t.VotationAnswerWrapper.Copy()
+			txCopy.VotationAnswerWrapper = &VotationAnswerWrapperCopy
     }
 
     if t.Signature != nil {

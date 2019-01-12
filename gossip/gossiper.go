@@ -69,6 +69,9 @@ type Gossiper struct {
 
     Blockchain *Blockchain
     PrivateKey *rsa.PrivateKey
+	
+	QuestionKey map[string]string
+	QuestionKeyMutex sync.Mutex
 }
 
 func NewGossiper(address, name string, peers []string, rtimer int, simple bool) *Gossiper {
@@ -106,6 +109,9 @@ func NewGossiper(address, name string, peers []string, rtimer int, simple bool) 
 
         Blockchain: NewBlockchain(),
         PrivateKey: NewPrivateKey(),
+		
+		QuestionKey: make(map[string]string),
+		QuestionKeyMutex: sync.Mutex{},
     }
 }
 

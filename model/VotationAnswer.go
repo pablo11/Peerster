@@ -1,13 +1,17 @@
 package model
 
 import (
-    "encoding/binary"
     "crypto/sha256"
     "encoding/hex"
 	"strconv"
+	"crypto/rand"
+	"crypto/aes"
+    "crypto/cipher"
+    "github.com/dedis/protobuf"
+	"io"
 )
 
-//VERIFY NAMES AFTER RIC PUSH
+//======================VOTATION ANSWER WRAPPED=========================
 
 type VotationAnswerWrapper struct{
 	Answer 		[]byte
@@ -15,16 +19,16 @@ type VotationAnswerWrapper struct{
 	Origin		string
 }
 
-func (*VotationAnswerWrapper vaw) Hash() string{
+func (vaw *VotationAnswerWrapper) Hash() []byte{
 	sha_256 := sha256.New()
 	sha_256.Write(vaw.Answer)
 	sha_256.Write([]byte(vaw.Question))
 	sha_256.Write([]byte(vaw.Origin))
 	
-	return hex.EncodeToString(sha_256.Sum(nil))
+	return sha_256.Sum(nil)
 }
 
-func (*VotationAnswerWrapper vaw) Copy() VotationAnswerWrapper {
+func (vaw *VotationAnswerWrapper) Copy() VotationAnswerWrapper {
 	new_answer := make([]byte, len(vaw.Answer))
 	copy(new_answer,vaw.Answer)
 	
@@ -37,26 +41,59 @@ func (*VotationAnswerWrapper vaw) Copy() VotationAnswerWrapper {
 	return new_vaw
 }
 
+func (vaw *VotationAnswerWrapper) String() string {
+    return "VOTATION_ANSWER_WRAPPED= FROM " + vaw.Origin +" QUESTION "+vaw.Question
+}
+
+
+//=========================VOTATION ANSWER================================
 type VotationAnswer struct{
 	Answer		bool
 	Replier		string
 }
 
-func (*VotationAnswer va) Hash() string{
+func (va *VotationAnswer) Hash() string{
 	sha_256 := sha256.New()
-	ans := byte{}
 	sha_256.Write([]byte(strconv.FormatBool(va.Answer)))
 	sha_256.Write([]byte(va.Replier))
 	
 	return hex.EncodeToString(sha_256.Sum(nil))
 }
 
-func (*VotationAnswer va) Copy() VotationAnswer{
+func (va *VotationAnswer) Copy() VotationAnswer{
 	new_va := VotationAnswer{
 		Answer: va.Answer,
 		Replier: va.Replier,
 	}
 	
 	return new_va
+}
+
+func (va *VotationAnswer) String() string {
+    return "VOTATION_ANSWER= FROM " + va.Replier +" ANSWER "+strconv.FormatBool(va.Answer)
+}
+
+
+func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
+
+	va_encoded, err := protobuf.Encode(va) // Do we need to copy here?
+	
+
+    c, err := aes.NewCipher(key)
+    if err != nil {
+        return nil, err
+    }
+
+    gcm, err := cipher.NewGCM(c)
+    if err != nil {
+        return nil, err
+    }
+
+    nonce := make([]byte, gcm.NonceSize())
+    if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+        return nil, err
+    }
+
+    return gcm.Seal(nonce, nonce, va_encoded, nil), nil
 }
 

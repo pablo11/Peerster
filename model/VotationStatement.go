@@ -1,7 +1,6 @@
 package model
 
 import (
-    "encoding/binary"
     "crypto/sha256"
     "encoding/hex"
 )
@@ -11,14 +10,14 @@ type VotationStatement struct{
 	Origin		string
 }
 
-func (*VotationStatement vs) Hash() string{
+func (vs *VotationStatement) Hash() []byte{
 	sha_256 := sha256.New()
 	sha_256.Write([]byte(vs.Question))
 	sha_256.Write([]byte(vs.Origin))
-	return hex.EncodeToString(sha_256.Sum(nil))
+	return sha_256.Sum(nil)
 }
 
-func (*VotationStatement vs) Copy() VotationStatement {
+func (vs *VotationStatement) Copy() VotationStatement {
 	new_vs := VotationStatement{
 		Question: vs.Question,
 		Origin:	vs.Origin,
@@ -26,3 +25,11 @@ func (*VotationStatement vs) Copy() VotationStatement {
 	
 	return new_vs
 } 
+
+func (vs *VotationStatement) String() string {
+    return "VOTATION_STATEMENT= FROM " + vs.Origin +" QUESTION "+vs.Question
+}
+
+func (vs *VotationStatement) GetId() string{
+	return hex.EncodeToString(vs.Hash())
+}

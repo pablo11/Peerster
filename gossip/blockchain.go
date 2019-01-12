@@ -36,11 +36,11 @@ type Blockchain struct {
 
 	
 	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: []VotationStatement]
-    voteStatement map[string][]*model.VotationStatement
+    voteStatement map[string]*model.VotationStatement
     voteStatementMutex sync.Mutex
 	
 	// Mapping of votation_id to array of VotationReplyWrapped in the blockchain [k: votation_id => v: []VotationReplyWrapped]
-	voteAnswers map[string][]*model.VotationAnswerWrapped
+	voteAnswers map[string][]*model.VotationAnswerWrapper
 	voteAnswersMutex sync.Mutex
 
     // Mapping of assets to users holdings: [assetName: string => [holderName: string => amount: uint64]]
@@ -68,10 +68,10 @@ func NewBlockchain() *Blockchain {
         identities: make(map[string]*model.Identity),
         identitiesMutex: sync.Mutex{},
 		
-		voteStatement: make(map[string][]*model.VotationStatement),
+		voteStatement: make(map[string]*model.VotationStatement),
         voteStatementMutex: sync.Mutex{},
 		
-		voteAnswers: make(map[string][]*model.VotationAnswerWrapped),
+		voteAnswers: make(map[string][]*model.VotationAnswerWrapper),
         voteAnswersMutex: sync.Mutex{},
 
         assets: make(map[string]map[string]uint64),
@@ -114,7 +114,7 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
         }
 
         // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-        b.addTxToPool(tp.Transaction)
+        b.addTxToPool(&tp.Transaction)
     }
 
     // If HopLimit is > 1 decrement and broadcast
@@ -189,7 +189,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
     return
 }
 
-func (b *Blockchain) addTxToPool(t model.Transaction) {
+func (b *Blockchain) addTxToPool(t *model.Transaction) {
     // Add only if not already there
     b.txsPoolMutex.Lock()
     for _, tx := range b.txsPool {
@@ -437,7 +437,7 @@ func (b *Blockchain) SendTxPublish(tx *model.Transaction) {
     }
 
     // Add the transaction to the pool of transactions to be added in the next block
-    b.addTxToPool(*tx)
+    b.addTxToPool(tx)
 
     b.broadcastTxPublish(&tp)
 }
