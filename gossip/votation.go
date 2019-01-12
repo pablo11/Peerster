@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
-	"github.com/pablo11/Peerster/util/debug"
+	//"github.com/pablo11/Peerster/util/debug"
 )
 
 func (g *Gossiper) LaunchVotation(question string, assetName string){

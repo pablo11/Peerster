@@ -8,7 +8,7 @@ import (
 	"crypto/aes"
     "crypto/cipher"
     "github.com/dedis/protobuf"
-	"github.com/pablo11/Peerster/util/debug"
+	//"github.com/pablo11/Peerster/util/debug"
 	"io"
 	"errors"
 )

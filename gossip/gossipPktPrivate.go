@@ -3,7 +3,7 @@ package gossip
 import (
     "fmt"
     "github.com/pablo11/Peerster/model"
-	"github.com/pablo11/Peerster/util/debug"
+	//"github.com/pablo11/Peerster/util/debug"
 	"regexp"
 )
 
