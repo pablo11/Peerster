@@ -17,6 +17,8 @@ type VotationAnswerWrapper struct{
 	Answer 		[]byte
 	Question	string
 	Origin		string
+	AssetName	string
+	Replier		string
 }
 
 func (vaw *VotationAnswerWrapper) Hash() []byte{
@@ -24,6 +26,8 @@ func (vaw *VotationAnswerWrapper) Hash() []byte{
 	sha_256.Write(vaw.Answer)
 	sha_256.Write([]byte(vaw.Question))
 	sha_256.Write([]byte(vaw.Origin))
+	sha_256.Write([]byte(vaw.AssetName))
+	sha_256.Write([]byte(vaw.Replier))
 	
 	return sha_256.Sum(nil)
 }
@@ -36,26 +40,34 @@ func (vaw *VotationAnswerWrapper) Copy() VotationAnswerWrapper {
 		Answer: new_answer,
 		Question: vaw.Question,
 		Origin:	vaw.Origin,
+		AssetName: vaw.AssetName,
+		Replier: vaw.Replier,
 	}
 	
 	return new_vaw
 }
 
 func (vaw *VotationAnswerWrapper) String() string {
-    return "VOTATION_ANSWER_WRAPPED= FROM " + vaw.Origin +" QUESTION "+vaw.Question
+    return "VOTATION_ANSWER_WRAPPED= FROM " + vaw.Origin +" QUESTION "+vaw.Question +" ASSET "+vaw.AssetName+" REPLIED BY "+vaw.Replier
 }
 
+func (vaw *VotationAnswerWrapper) GetVotationId() string{
+	new_vs := &VotationStatement{
+		Question: vaw.Question,
+		Origin:	vaw.Origin,
+		AssetName: vaw.AssetName,
+	}
+	return hex.EncodeToString(new_vs.Hash())
+}
 
 //=========================VOTATION ANSWER================================
 type VotationAnswer struct{
 	Answer		bool
-	Replier		string
 }
 
 func (va *VotationAnswer) Hash() string{
 	sha_256 := sha256.New()
 	sha_256.Write([]byte(strconv.FormatBool(va.Answer)))
-	sha_256.Write([]byte(va.Replier))
 	
 	return hex.EncodeToString(sha_256.Sum(nil))
 }
@@ -63,14 +75,13 @@ func (va *VotationAnswer) Hash() string{
 func (va *VotationAnswer) Copy() VotationAnswer{
 	new_va := VotationAnswer{
 		Answer: va.Answer,
-		Replier: va.Replier,
 	}
 	
 	return new_va
 }
 
 func (va *VotationAnswer) String() string {
-    return "VOTATION_ANSWER= FROM " + va.Replier +" ANSWER "+strconv.FormatBool(va.Answer)
+    return "VOTATION_ANSWER= "+strconv.FormatBool(va.Answer)
 }
 
 

@@ -35,12 +35,12 @@ type Blockchain struct {
     identitiesMutex sync.Mutex
 
 	
-	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: []VotationStatement]
+	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: *VotationStatement]
     voteStatement map[string]*model.VotationStatement
     voteStatementMutex sync.Mutex
 	
-	// Mapping of votation_id to array of VotationReplyWrapped in the blockchain [k: votation_id => v: []VotationReplyWrapped]
-	voteAnswers map[string][]*model.VotationAnswerWrapper
+	// Mapping of votation_id to array of VotationReplyWrapped in the blockchain [votation_id: string => [holderName: string => votationAnswerWrapper: *VotationAnswerWrapper]]
+	voteAnswers map[string]map[string]*model.VotationAnswerWrapper
 	voteAnswersMutex sync.Mutex
 
     // Mapping of assets to users holdings: [assetName: string => [holderName: string => amount: uint64]]
@@ -71,7 +71,7 @@ func NewBlockchain() *Blockchain {
 		voteStatement: make(map[string]*model.VotationStatement),
         voteStatementMutex: sync.Mutex{},
 		
-		voteAnswers: make(map[string][]*model.VotationAnswerWrapper),
+		voteAnswers: make(map[string]map[string]*model.VotationAnswerWrapper),
         voteAnswersMutex: sync.Mutex{},
 
         assets: make(map[string]map[string]uint64),
@@ -121,6 +121,7 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
     b.broadcastTxPublishDecrementingHopLimit(tp)
 }
 
+//RAF: MODIF FOR VOTATION
 func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg string) {
     errorMsg = ""
     isValid = true
@@ -185,6 +186,100 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
                 b.assetsMutex.Unlock()
             }
             //*/
+			
+		case tx.VotationAnswerWrapper != nil:
+			//To be rejected, a votation answer wrapped:
+			//1. QuestionId does not exist
+			//2. Replier doesn't have shares in this asset
+			//3. Replier already answer this question
+			
+			//1.
+			questionId := tx.VotationAnswerWrapper.GetVotationId()
+			
+			b.voteStatementMutex.Lock()
+			_, votationExist := b.voteStatement[questionId]
+			b.voteStatementMutex.Unlock()
+			
+			if !votationExist{
+				errorMsg = "The votation "+questionId+" does not exists"
+				isValid = false
+				return
+			}
+			
+			//2.
+			b.assetsMutex.Lock()
+			asset, assetExists := b.assets[tx.VotationAnswerWrapper.AssetName]
+			b.assetsMutex.Unlock()
+			
+			if !assetExists{
+				errorMsg = "The asset "+ tx.VotationAnswerWrapper.AssetName +" doesn't exist"
+				isValid = false
+				return
+			}
+			
+			share, shareExists := asset[tx.VotationAnswerWrapper.Replier]
+			if !shareExists || share <= 0 {
+				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" does not have shares in asset "+ tx.VotationAnswerWrapper.AssetName
+				isValid = false
+				return
+			}
+			
+			//3.
+			b.voteAnswersMutex.Lock()
+			voteAnswer, voteAnswerExists := b.voteAnswers[questionId]
+			var replierAlreadyAnswer bool
+			if voteAnswerExists {
+				_,replierAlreadyAnswer = voteAnswer[tx.VotationAnswerWrapper.Replier]
+			}
+			b.voteAnswersMutex.Unlock()
+			
+			if replierAlreadyAnswer {
+				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" already answer this question"
+				isValid = false
+				return
+			}
+			
+		
+		case tx.VotationStatement != nil:
+			//To be rejected, a votation statement:
+			//1. is already present with same questionID
+			//2. Assetname doesn't exist
+			//3. Origin has no share in this asset
+			
+			//1.
+			questionId := tx.VotationStatement.GetId()
+			
+			b.voteStatementMutex.Lock()
+			_, votationExist := b.voteStatement[questionId]
+			b.voteStatementMutex.Unlock()
+			
+			if votationExist{
+				errorMsg = "The votation "+questionId+" already exists"
+				isValid = false
+				return
+			}
+			
+			//2.
+			b.assetsMutex.Lock()
+			asset, assetExists := b.assets[tx.VotationStatement.AssetName]
+			b.assetsMutex.Unlock()
+			
+			if !assetExists{
+				errorMsg = "The asset "+ tx.VotationStatement.AssetName +"doesn't exist"
+				isValid = false
+				return
+			} 
+			
+			//3.
+			share, shareExists := asset[tx.VotationStatement.Origin]
+			if !shareExists || share <= 0 {
+				errorMsg = "The origin "+tx.VotationStatement.Origin+"does not have shares in asset "+ tx.VotationStatement.AssetName
+				isValid = false
+				return
+			}
+		
+		
+		
     }
     return
 }

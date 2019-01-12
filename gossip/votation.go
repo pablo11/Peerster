@@ -16,6 +16,7 @@ func (g *Gossiper) launchVotation(question string, assetName string){
 	vs := model.VotationStatement{
 		Question: question,
 		Origin:	g.Name,
+		AssetName: assetName,
 	}
 	
 	sign := g.SignVotingStatement(&vs)
@@ -25,7 +26,12 @@ func (g *Gossiper) launchVotation(question string, assetName string){
 		Signature: sign,
 	}
 	
-	g.Blockchain.addTxToPool(&tx) // DOES THIS SEND TXS TO ALL??
+	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
+	if !isValid {
+        fmt.Println("Discarding Tx: " + errorMsg)
+        return
+    }
+	g.Blockchain.SendTxPublish(&tx)
 	
 	key := make([]byte, 32)
 	rand.Read(key)
@@ -44,6 +50,7 @@ func (g *Gossiper) launchVotation(question string, assetName string){
 	g.Blockchain.assetsMutex.Unlock()
 	
 	g.sendKeyToAllPeers(peers,key_str,vs.GetId())
+	
 }
 
 func (g *Gossiper) answerVotation(votation_id string, answer bool){
@@ -56,12 +63,16 @@ func (g *Gossiper) answerVotation(votation_id string, answer bool){
 	
 	va := model.VotationAnswer{
 		Answer: answer,
-		Replier: g.Name, 
 	}
 	
 	g.QuestionKeyMutex.Lock()
-	key := g.QuestionKey[votation_id] //Get key received in private message
+	key, ok := g.QuestionKey[votation_id] //Get key received in private message
 	g.QuestionKeyMutex.Unlock()
+	
+	if !ok {
+		log.Fatal("Fail to retreive the key to answer to this question")
+		return
+	}
 	
 	key_byte, err := hex.DecodeString(key)
 	if err != nil{
@@ -81,6 +92,8 @@ func (g *Gossiper) answerVotation(votation_id string, answer bool){
 		Answer: va_enc,
 		Question: question.Question,
 		Origin: question.Origin,
+		AssetName: question.AssetName,
+		Replier: g.Name, 
 	}
 	
 	sign := g.SignVotationAnswerWrapper(&vaw)
@@ -90,22 +103,21 @@ func (g *Gossiper) answerVotation(votation_id string, answer bool){
 		Signature: sign,
 	}
 	
-	g.Blockchain.addTxToPool(&tx) // DOES THIS SEND TXS TO ALL??
+	//Send SendFileTx
+	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
+	if !isValid {
+        fmt.Println("Discarding Tx: " + errorMsg)
+        return
+    }
+	g.Blockchain.SendTxPublish(&tx)
 	
-	//move from pending to completed?
+	//move from pending to completed? => This is done in GUI
 }
 
 func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId string){	
 
 	for _,p := range peers{
-		//HAS TO BE CHANGED for that pm := NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
-		pm := &model.PrivateMessage{
-			Origin: g.Name,
-			ID: 0,
-			Text: createPMWithKey(key,questionId),
-			Destination: p,
-			HopLimit: 10,
-		}
+		pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
 		
 		//ENCRYPT PRIVATE !!
 		g.SendPrivateMessage(pm)
