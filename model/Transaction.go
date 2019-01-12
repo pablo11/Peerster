@@ -3,6 +3,7 @@ package model
 import (
     "crypto/sha256"
     "encoding/hex"
+    //"github.com/pablo11/Peerster/util/debug"
 )
 
 type Transaction struct {

@@ -438,6 +438,7 @@ func (g *Gossiper) sendStatusMessage(toPeer string) {
 func (g *Gossiper) sendGossipPacket(gp *model.GossipPacket, peersAddr []string) {
     packetBytes, err := protobuf.Encode(gp)
     if err != nil {
+        fmt.Println("DEBUG PROTOBUF")
         fmt.Println(err)
         err = nil
         return

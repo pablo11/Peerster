@@ -18,8 +18,19 @@ func main() {
     request := flag.String("request", "", "Request a chunk or metafile of this hash")
     keywords := flag.String("keywords", "", "Keywords for the file search")
     budget := flag.Int("budget", 0, "Budget for the file search")
+    identity := flag.String("identity", "", "Identity on the blockchain")
 
     flag.Parse()
+
+    // Ask to insert an identity on the blockchain
+    if *identity != "" {
+        cm := &model.ClientMessage{
+            Type: "identity",
+            Identity: *identity,
+        }
+        sendPacket(cm, *uiPort)
+        return
+    }
 
     // Ask to index file
     if *file != "" && *request == "" {
