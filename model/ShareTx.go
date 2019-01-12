@@ -1,6 +1,7 @@
 package model
 
 import (
+    "time"
     "strconv"
     "crypto/sha256"
     "encoding/hex"
@@ -12,6 +13,11 @@ type ShareTx struct {
     Amount uint64
     From string // The name of the sender of the transaction
     To string // The name of the destinatary taken from the identities in the blockchain
+    Nonce int64 // This nonce is required to make the hash of two transaction with the same content deifferent
+}
+
+func (st *ShareTx) GenerateNonce() {
+    st.Nonce = time.Now().UnixNano()
 }
 
 func (st *ShareTx) Hash() (out [32]byte) {
@@ -20,6 +26,7 @@ func (st *ShareTx) Hash() (out [32]byte) {
     h.Write([]byte(st.Asset))
     h.Write([]byte(st.From))
     h.Write([]byte(st.To))
+    binary.Write(h, binary.LittleEndian, st.Nonce)
     copy(out[:], h.Sum(nil))
     return
 }
@@ -39,5 +46,6 @@ func (st *ShareTx) Copy() ShareTx {
         Amount: st.Amount,
         From: st.From,
         To: st.To,
+        Nonce: st.Nonce,
     }
 }

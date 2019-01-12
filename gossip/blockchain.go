@@ -1,6 +1,7 @@
 package gossip
 
 import (
+	"strconv"
 	"bytes"
 	"crypto/rsa"
 	"encoding/hex"
@@ -132,12 +133,22 @@ func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, er
     isValid = true
 
     // Make sure that the sender (From) and destinatary (To) identities are in the blockchain
-    b.identitiesMutex.Lock()
-    _ /*fromIdentity*/, isFromRegistered := b.identities[st.From]
+	if st.From != "" {
+		b.identitiesMutex.Lock()
+	    _ /*fromIdentity*/, isFromRegistered := b.identities[st.From]
+	    b.identitiesMutex.Unlock()
+		if !isFromRegistered {
+			errorMsg = "No identities found for the sender of the share transaction"
+	        isValid = false
+	        return
+		}
+	}
+
+	b.identitiesMutex.Lock()
     _ /*toIdentity*/, isToRegistered := b.identities[st.To]
     b.identitiesMutex.Unlock()
-    if !isFromRegistered || !isToRegistered {
-        errorMsg = "No identities found for the share transaction"
+    if !isToRegistered {
+        errorMsg = "No identities found for the destinatary of the share transaction"
         isValid = false
         return
     }
@@ -160,7 +171,7 @@ func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, er
 func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
     tmpAssets := make(map[string]map[string]uint64)
 
-    for _, tx := range txs {
+    for i, tx := range txs {
         if tx.ShareTx != nil {
             b.assetsMutex.Lock()
             asset, assetExists := b.assets[tx.ShareTx.Asset]
@@ -173,7 +184,7 @@ func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
                     // The asset doesn't exist in our temporary version of the assets, get the user balance from
                     fromBalance, fromBalanceExists := asset[tx.ShareTx.From]
                     if !fromBalanceExists {
-                        debug.Debug("Discarding block: invalid asset transaction")
+                        debug.Debug("Discarding block: invalid asset transaction " + strconv.Itoa(i) + " - " + tx.ShareTx.From)
                         return false
                     }
                     tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
@@ -188,7 +199,7 @@ func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
 
                 fromAmount, fromAmountNonzero := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From]
                 if !fromAmountNonzero || fromAmount < tx.ShareTx.Amount {
-                    debug.Debug("Discarding block: invalid asset transaction")
+                    debug.Debug("Discarding block: invalid asset transaction2")
                     return false
                 } else {
                     tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] -= tx.ShareTx.Amount
@@ -240,7 +251,7 @@ func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
                 // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
                 b.assetsMutex.Lock()
                 b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
-                b.assets[tx.ShareTx.Asset][tx.ShareTx.From] = tx.ShareTx.Amount
+                b.assets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
                 b.assetsMutex.Unlock()
             }
         }
@@ -359,6 +370,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
     // Integrate transactions
     b.integrateValidTxs(&bp.Block)
 
+	b.printAssetsOwnership()
+
     // If HopLimit is > 1 decrement and broadcast
     b.broadcastBlockPublishDecrementingHopLimit(bp)
 }
@@ -469,6 +482,21 @@ func (b *Blockchain) printBlockchain(headHash string) {
 	fmt.Println("⛓ CHAIN" + chainStr + "\n")
 }
 
+func (b *Blockchain) printAssetsOwnership() {
+	toPrint := ""
+	b.assetsMutex.Lock()
+	for assetName, asset := range b.assets {
+		toPrint += assetName + ":"
+		for ownerName, amount := range asset {
+			toPrint += "\n---" + ownerName + ": " + strconv.Itoa(int(amount))
+		}
+		toPrint += "\n"
+	}
+	b.assetsMutex.Unlock()
+
+	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
+}
+
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {
 	gp := model.GossipPacket{TxPublish: tp}
 	go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
@@ -498,6 +526,26 @@ func (b *Blockchain) broadcastBlockPublishDecrementingHopLimit(bp *model.BlockPu
 func (b *Blockchain) SendFileTx(file *model.File) {
 	tx := model.Transaction{
 		File: file,
+	}
+	b.SendTxPublish(&tx)
+}
+
+func (b *Blockchain) SendShareTx(asset, to string, amount uint64) {
+	shareTx := model.ShareTx{
+		Asset: asset,
+		Amount: amount,
+		From: "",
+		To: to,
+	}
+
+	if b.gossiper.Name != to {
+		shareTx.From = b.gossiper.Name
+	}
+
+	shareTx.GenerateNonce()
+
+	tx := model.Transaction{
+		ShareTx: &shareTx,
 	}
 	b.SendTxPublish(&tx)
 }
