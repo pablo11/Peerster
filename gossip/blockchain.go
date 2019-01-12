@@ -1,6 +1,7 @@
 package gossip
 
 import (
+	"strings"
 	"strconv"
 	"bytes"
 	"crypto/rsa"
@@ -67,6 +68,25 @@ func NewBlockchain() *Blockchain {
 
 func (b *Blockchain) SetGossiper(g *Gossiper) {
 	b.gossiper = g
+}
+
+func (b *Blockchain) GetMyAssetsJson() string {
+	myAssetsStr := make([]string, 0)
+	b.assetsMutex.Lock()
+    for assetName, assetOwnership := range b.assets {
+        amount, nonzero := assetOwnership[b.gossiper.Name]
+		if nonzero {
+			var totalSupply uint64 = 0
+			for _, holderAmount := range assetOwnership {
+				totalSupply += holderAmount
+			}
+
+			myAssetsStr = append(myAssetsStr, "\"" + assetName + "\":{\"balance\":" + strconv.Itoa(int(amount)) + ",\"totSupply\":" + strconv.Itoa(int(totalSupply)) + "}")
+		}
+    }
+	b.assetsMutex.Unlock()
+
+	return `{` + strings.Join(myAssetsStr, ",") + `}`
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
