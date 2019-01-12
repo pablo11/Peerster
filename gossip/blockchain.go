@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 	"github.com/pablo11/Peerster/model"
-	//"github.com/pablo11/Peerster/util/debug"
+	"github.com/pablo11/Peerster/util/debug"
 )
 
 type Blockchain struct {
@@ -69,106 +69,185 @@ func (b *Blockchain) SetGossiper(g *Gossiper) {
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
-	tp := gp.TxPublish
+    tp := gp.TxPublish
 
-	// Validate signature
-	if tp.Transaction.Signature != nil {
+    // Discard transactions that is already in the pool
+    txAlreadyInPool := false
+    b.txsPoolMutex.Lock()
+    for _, tx := range b.txsPool {
+        if tx.HashStr() == tp.Transaction.HashStr() {
+            txAlreadyInPool = true
+            break
+        }
+    }
+    b.txsPoolMutex.Unlock()
 
-		// TODO: validate signature (get the public key of the identity with name tp.Transaction.Signature.Origin and call the IsValid method of Signature)
+    if !txAlreadyInPool {
+        // Validate transaction according to its content
+        isValid, errorMsg := b.isValidTx(&tp.Transaction)
+        if !isValid {
+            fmt.Println("Discarding TxPublish: " + errorMsg)
+            return
+        }
 
-	}
+        // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
+        b.addTxToPool(tp.Transaction)
+    }
 
-	// Discard transactions that is already in the pool
-	txAlreadyInPool := false
-	b.txsPoolMutex.Lock()
-	for _, tx := range b.txsPool {
-		if tx.HashStr() == tp.Transaction.HashStr() {
-			txAlreadyInPool = true
-			break
-		}
-	}
-	b.txsPoolMutex.Unlock()
-
-	if !txAlreadyInPool {
-		// Validate transaction according to its content
-		isValid, errorMsg := b.isValidTx(&tp.Transaction)
-		if !isValid {
-			fmt.Println("Discarding TxPublish: " + errorMsg)
-			return
-		}
-
-		// If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-		b.addTxToPool(tp.Transaction)
-	}
-
-	// If HopLimit is > 1 decrement and broadcast
-	b.broadcastTxPublishDecrementingHopLimit(tp)
+    // If HopLimit is > 1 decrement and broadcast
+    b.broadcastTxPublishDecrementingHopLimit(tp)
 }
 
 func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg string) {
-	errorMsg = ""
-	isValid = true
+    errorMsg = ""
+    isValid = true
 
-	switch {
-	case tx.File != nil:
-		// Check if I have already seen this transactions since the last block mined
-		b.filenamesMutex.Lock()
-		_, filenameAlreadyCaimed := b.filenames[tx.File.Name]
-		if filenameAlreadyCaimed {
-			b.filenamesMutex.Unlock()
-			errorMsg = "Filename already claimed"
-			isValid = false
-			return
-		}
-		b.filenamesMutex.Unlock()
-
-	case tx.Identity != nil:
-
-		// TODO: implement
-
-	case tx.ShareTx != nil:
-
-		// TODO: make sure that the destinatary of the transaction is in the blockchain identities.
-		// Also make sure that the transaction is signed by the private key corresponding to the public key claimed by the from name
-
-		// Check if the asset already exists
-		b.assetsMutex.Lock()
-		asset, assetExists := b.assets[tx.ShareTx.Asset]
-		b.assetsMutex.Unlock()
-
-		if assetExists && asset[tx.ShareTx.From] < tx.ShareTx.Amount {
-			errorMsg = tx.ShareTx.From + " doesn't have enough " + tx.ShareTx.Asset
-			isValid = false
-			return
-		}
-
-		/*
-		   if assetExists {
-
-		       // TODO: make sure Fom and To are present in the asset shares mapping
-
-		       // The asset exists, we need to do a transaction from one holder to another
-		       if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
-		           // The holder doesn't have enough to asset to perform the transaction
+    switch {
+        case tx.File != nil:
+            // Check if I have already seen this transactions since the last block mined
+            b.filenamesMutex.Lock()
+            _, filenameAlreadyCaimed := b.filenames[tx.File.Name]
+            if filenameAlreadyCaimed {
+                b.filenamesMutex.Unlock()
+                errorMsg = "Filename already claimed"
+                isValid = false
+                return
+            }
+            b.filenamesMutex.Unlock()
 
 
-		       } else {
-		           b.assetsMutex.Lock()
-		           asset[tx.ShareTx.From] -= tx.ShareTx.Amount
-		           asset[tx.ShareTx.To] += tx.ShareTx.Amount
-		           b.assetsMutex.Unlock()
-		       }
-		   } else {
-		       // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
-		       b.assetsMutex.Lock()
-		       b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
-		       b.assets[tx.ShareTx.Asset][tx.ShareTx.From] = tx.ShareTx.Amount
-		       b.assetsMutex.Unlock()
-		   }
-		   //*/
-	}
-	return
+        case tx.Identity != nil:
+
+            // TODO: implement
+
+        case tx.ShareTx != nil:
+            // Check if the two identities in the share transaction are in the blockchain and that the transaction is validly signed by the sender of the transaction
+            isValid, errorMsg = b.isShareTxValidlySigned(tx.ShareTx)
+    }
+    return
 }
+
+func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, errorMsg string) {
+    errorMsg = ""
+    isValid = true
+
+    // Make sure that the sender (From) and destinatary (To) identities are in the blockchain
+    b.identitiesMutex.Lock()
+    _ /*fromIdentity*/, isFromRegistered := b.identities[st.From]
+    _ /*toIdentity*/, isToRegistered := b.identities[st.To]
+    b.identitiesMutex.Unlock()
+    if !isFromRegistered || !isToRegistered {
+        errorMsg = "No identities found for the share transaction"
+        isValid = false
+        return
+    }
+
+    // Validate signature with the identity of the sender (From)
+
+    isValidSignature := true // TODO: need to check the signature against the sender identity
+
+    if !isValidSignature {
+        errorMsg = "Invalid signature of share transaction"
+        isValid = false
+        return
+    }
+
+    return
+}
+
+// This function assumes that the ShareTxs's signature contained in the list of transactions are already validated
+// To simplify the implementation, the order of thransactions in the block must be valid to be accepted
+func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
+    tmpAssets := make(map[string]map[string]uint64)
+
+    for _, tx := range txs {
+        if tx.ShareTx != nil {
+            b.assetsMutex.Lock()
+            asset, assetExists := b.assets[tx.ShareTx.Asset]
+            b.assetsMutex.Unlock()
+
+            if assetExists {
+                // Check if sender has sufficeint balance
+                _, tmpAssetPresent := tmpAssets[tx.ShareTx.Asset]
+                if !tmpAssetPresent {
+                    // The asset doesn't exist in our temporary version of the assets, get the user balance from
+                    fromBalance, fromBalanceExists := asset[tx.ShareTx.From]
+                    if !fromBalanceExists {
+                        debug.Debug("Discarding block: invalid asset transaction")
+                        return false
+                    }
+                    tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] = fromBalance
+
+                    toBalance, toBalanceExists := asset[tx.ShareTx.To]
+                    if !toBalanceExists {
+                        toBalance = 0
+                    }
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = toBalance
+                }
+
+                fromAmount, fromAmountNonzero := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From]
+                if !fromAmountNonzero || fromAmount < tx.ShareTx.Amount {
+                    debug.Debug("Discarding block: invalid asset transaction")
+                    return false
+                } else {
+                    tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] -= tx.ShareTx.Amount
+                    if tmpAssets[tx.ShareTx.Asset][tx.ShareTx.From] == 0 {
+                        delete(tmpAssets[tx.ShareTx.Asset], tx.ShareTx.From)
+                    }
+
+                    _, toAmountExists := tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To]
+                    if toAmountExists {
+                        tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] += tx.ShareTx.Amount
+                    } else {
+                        tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+                    }
+                }
+            } else {
+                // Create the new asset
+                tmpAssets[tx.ShareTx.Asset] = make(map[string]uint64)
+                tmpAssets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
+            }
+        }
+    }
+    return true
+}
+
+// This function assumes that the transaction and it's content is already validated (identities existence, valid signature, prevent doublespending)
+func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
+    for _, tx := range txs {
+        if tx.ShareTx != nil {
+            b.assetsMutex.Lock()
+            asset, assetExists := b.assets[tx.ShareTx.Asset]
+            b.assetsMutex.Unlock()
+            if assetExists {
+                // The asset exists, we need to do a transaction from the sender to the destinatary (is the sender has sufficient balance)
+                if asset[tx.ShareTx.From] < tx.ShareTx.Amount {
+                    // The holder doesn't have enough to asset to perform the transaction
+                    fmt.Println("ShareTx discarded since the sender doesn't have a sufficient balance")
+                } else {
+                    b.assetsMutex.Lock()
+                    asset[tx.ShareTx.From] -= tx.ShareTx.Amount
+                    _, destinataryHashShares := asset[tx.ShareTx.To]
+                    if destinataryHashShares {
+                        asset[tx.ShareTx.To] += tx.ShareTx.Amount
+                    } else {
+                        asset[tx.ShareTx.To] = tx.ShareTx.Amount
+                    }
+                    b.assetsMutex.Unlock()
+                }
+            } else {
+                // The asset doesn't exist yet, we need to create it and assign all the amount to the initiator of the transaction
+                b.assetsMutex.Lock()
+                b.assets[tx.ShareTx.Asset] = make(map[string]uint64)
+                b.assets[tx.ShareTx.Asset][tx.ShareTx.From] = tx.ShareTx.Amount
+                b.assetsMutex.Unlock()
+            }
+        }
+    }
+}
+
+
 
 func (b *Blockchain) addTxToPool(t model.Transaction) {
 	// Add only if not already there
@@ -186,113 +265,122 @@ func (b *Blockchain) addTxToPool(t model.Transaction) {
 }
 
 func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
-	bp := gp.BlockPublish
+    bp := gp.BlockPublish
 
-	// Validate PoW
-	if !bp.Block.IsValid() {
-		fmt.Println("Discarding BlockPublish since the PoW is invalid")
-		return
-	}
+    // Validate PoW
+    if !bp.Block.IsValid() {
+        fmt.Println("Discarding BlockPublish since the PoW is invalid")
+        return
+    }
 
-	blockHash := bp.Block.Hash()
-	blockHashStr := hex.EncodeToString(blockHash[:])
+    blockHash := bp.Block.Hash()
+    blockHashStr := hex.EncodeToString(blockHash[:])
 
-	// Check if we already have the block
-	b.blocksMutex.Lock()
-	_, isPresent := b.blocks[blockHashStr]
-	b.blocksMutex.Unlock()
-	if isPresent {
-		// Forward the blockPublish since someone could not have it
-		b.broadcastBlockPublishDecrementingHopLimit(bp)
-		//fmt.Println("Discarding BlockPublish since block is already in the blockchain")
-		return
-	}
+    // Check if we already have the block
+    b.blocksMutex.Lock()
+    _, isPresent := b.blocks[blockHashStr]
+    b.blocksMutex.Unlock()
+    if isPresent {
+        // Forward the blockPublish since someone could not have it
+        b.broadcastBlockPublishDecrementingHopLimit(bp)
+        //fmt.Println("Discarding BlockPublish since block is already in the blockchain")
+        return
+    }
 
-	// Validate all transactions in the block before integrating it into the blockchain
-	for _, tx := range bp.Block.Transactions {
-		isValid, errorMsg := b.isValidTx(&tx)
-		if !isValid {
-			fmt.Println("Invalid transaction: " + errorMsg)
-			return
-		}
-	}
+    // Validate all transactions in the block before integrating it into the blockchain
+    for _, tx := range bp.Block.Transactions {
+        isValid, errorMsg := b.isValidTx(&tx)
+        if !isValid {
+            fmt.Println("Invalid transaction: " + errorMsg)
+            return
+        }
+    }
 
-	//fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
+    // Validate transactions of type ShareTx
+    validTxShares := b.validateBlockShareTxs(bp.Block.Transactions)
+    if !validTxShares {
+        fmt.Println("Invalid asset transactions")
+        return
+    }
 
-	// Store block
-	newBlock := bp.Block.Copy()
-	b.blocksMutex.Lock()
-	b.blocks[blockHashStr] = &newBlock
-	b.blocksMutex.Unlock()
+    //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
 
-	// Check if this block is the continuation of a fork
-	isNewFork := true
-	b.forksMutex.Lock()
-	for lastHash, blockchainLength := range b.forks {
-		if lastHash == bp.Block.PrevHashStr() {
-			delete(b.forks, lastHash)
-			b.forks[blockHashStr] = blockchainLength + 1
-			isNewFork = false
+    // Store block
+    newBlock := bp.Block.Copy()
+    b.blocksMutex.Lock()
+    b.blocks[blockHashStr] = &newBlock
+    b.blocksMutex.Unlock()
 
-			// Check if we modified the longest chain
-			if b.longestChain == lastHash {
-				b.updateLongestChain(blockHashStr, &bp.Block)
-			} else {
-				// Check if this fork becomes the longest chain
-				if blockchainLength+1 > b.forks[b.longestChain] {
-					// We are switching to a new longest chain
-					fmt.Printf("FORK-LONGER rewind %d blocks\n", b.computeNbBlocksRewind(blockHashStr, b.longestChain))
-					b.updateLongestChain(blockHashStr, nil)
-				} else {
-					fmt.Println("BLOCK ADDED TO A SHORTER FORK")
-				}
-			}
-			break
-		}
-	}
-	b.forksMutex.Unlock()
+    // Check if this block is the continuation of a fork
+    isNewFork := true
+    b.forksMutex.Lock()
+    for lastHash, blockchainLength := range b.forks {
+        if lastHash == bp.Block.PrevHashStr() {
+            delete(b.forks, lastHash)
+            b.forks[blockHashStr] = blockchainLength + 1
+            isNewFork = false
 
-	if isNewFork {
-		// Count length of blockchain
-		blockchainLength := b.forkLength(blockHashStr)
+            // Check if we modified the longest chain
+            if b.longestChain == lastHash {
+                b.updateLongestChain(blockHashStr, &bp.Block)
+            } else {
+                // Check if this fork becomes the longest chain
+                if blockchainLength + 1 > b.forks[b.longestChain] {
+                    // We are switching to a new longest chain
+                    fmt.Printf("FORK-LONGER rewind %d blocks\n", b.computeNbBlocksRewind(blockHashStr, b.longestChain))
+                    b.updateLongestChain(blockHashStr, nil)
+                } else {
+                    fmt.Println("BLOCK ADDED TO A SHORTER FORK")
+                }
+            }
+            break
+        }
+    }
+    b.forksMutex.Unlock()
 
-		b.forksMutex.Lock()
-		b.forks[blockHashStr] = blockchainLength
-		b.forksMutex.Unlock()
+    if isNewFork {
+        // Count length of blockchain
+        blockchainLength := b.forkLength(blockHashStr)
 
-		if b.longestChain == "" && bp.Block.IsGenesis() {
-			// It's the first genesis block
-			b.updateLongestChain(blockHashStr, &bp.Block)
-		} else {
-			fmt.Println("FORK-SHORTER " + hex.EncodeToString(bp.Block.PrevHash[:]))
-		}
-	}
+        b.forksMutex.Lock()
+        b.forks[blockHashStr] = blockchainLength
+        b.forksMutex.Unlock()
 
-    // 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨 TODO: MOVE THAT UP, not always 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+        if b.longestChain == "" && bp.Block.IsGenesis() {
+            // It's the first genesis block
+            b.updateLongestChain(blockHashStr, &bp.Block)
+        } else {
+            fmt.Println("FORK-SHORTER " + hex.EncodeToString(bp.Block.PrevHash[:]))
+        }
+    }
 
-	// Integrate transactions
-	b.integrateValidTxs(&bp.Block)
+	// 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨 TODO: MOVE THAT UP, not always 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
 
-	// If HopLimit is > 1 decrement and broadcast
-	b.broadcastBlockPublishDecrementingHopLimit(bp)
+    // Integrate transactions
+    b.integrateValidTxs(&bp.Block)
+
+    // If HopLimit is > 1 decrement and broadcast
+    b.broadcastBlockPublishDecrementingHopLimit(bp)
 }
 
 func (b *Blockchain) integrateValidTxs(block *model.Block) {
-	for _, tx := range block.Transactions {
-		switch {
-		case tx.File != nil:
-			fileCopy := tx.File.Copy()
-			b.filenamesMutex.Lock()
-			b.filenames[tx.File.Name] = &fileCopy
-			b.filenamesMutex.Unlock()
+    for _, tx := range block.Transactions {
+        switch {
+            case tx.File != nil:
+                fileCopy := tx.File.Copy()
+                b.filenamesMutex.Lock()
+                b.filenames[tx.File.Name] = &fileCopy
+                b.filenamesMutex.Unlock()
 
-		case tx.Identity != nil:
-            identityCopy := tx.Identity.Copy()
-            b.identitiesMutex.Lock()
-            b.identities[tx.Identity.Name] = &identityCopy
-            b.identitiesMutex.Unlock()
-		}
-	}
+            case tx.Identity != nil:
+				identityCopy := tx.Identity.Copy()
+				b.identitiesMutex.Lock()
+				b.identities[tx.Identity.Name] = &identityCopy
+				b.identitiesMutex.Unlock()
+        }
+    }
+
+    b.applyShareTxs(block.Transactions)
 }
 
 func (b *Blockchain) updateLongestChain(blockHashStr string, block *model.Block) {
