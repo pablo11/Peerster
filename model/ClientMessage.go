@@ -11,6 +11,8 @@ type ClientMessage struct {
     Identity string
     Asset string
     Amount uint64
+	Origin string
+	Answer bool
 }
 
 func (cm *ClientMessage) String() string {

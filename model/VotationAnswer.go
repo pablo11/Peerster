@@ -8,7 +8,7 @@ import (
 	"crypto/aes"
     "crypto/cipher"
     "github.com/dedis/protobuf"
-	"github.com/pablo11/Peerster/util/debug"
+	//"github.com/pablo11/Peerster/util/debug"
 	"io"
 	"errors"
 )
@@ -63,7 +63,7 @@ func (vaw *VotationAnswerWrapper) GetVotationId() string{
 }
 
 func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
-	debug.Debug("Trying to decrypt votationAnswer with symmetric key")
+	//debug.Debug("Trying to decrypt votationAnswer with symmetric key")
 	
 	ciphertext := vaw.Answer
 	
@@ -82,7 +82,7 @@ func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
 	//THIS COULD PROBABLY FAIL BE CAREFUL !
     nonceSize := gcm.NonceSize()
     if len(ciphertext) < nonceSize {
-		debug.Debug("Votation Answer cipher text too short")
+		//debug.Debug("Votation Answer cipher text too short")
         return va_decoded, errors.New("ciphertext too short")
     }
 
@@ -98,11 +98,11 @@ func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
     err = protobuf.Decode(byte_decoded, &va_decoded)
 	
 	if err != nil {
-		debug.Debug("Votation Answer didn't deserialized with protobuf")
+		//debug.Debug("Votation Answer didn't deserialized with protobuf")
         return va_decoded, err
     }
 	
-	debug.Debug("Decryption votation Answer worked!")
+	//debug.Debug("Decryption votation Answer worked!")
 	
 	return va_decoded,err
 }
@@ -133,7 +133,7 @@ func (va *VotationAnswer) String() string {
 
 
 func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
-	debug.Debug("Trying to encrypt votationAnswer with symmetric key")
+	//debug.Debug("Trying to encrypt votationAnswer with symmetric key")
 	va_encoded, err := protobuf.Encode(va) 
 	
 
@@ -152,7 +152,7 @@ func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
         return nil, err
     }
 
-	debug.Debug("Encryption votation Answer worked!")
+	//debug.Debug("Encryption votation Answer worked!")
     return gcm.Seal(nonce, nonce, va_encoded, nil), nil
 }
 

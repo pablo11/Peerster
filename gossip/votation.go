@@ -2,11 +2,10 @@ package gossip
 
 import (
     "encoding/hex"
-	"log"
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
-	"github.com/pablo11/Peerster/util/debug"
+	//"github.com/pablo11/Peerster/util/debug"
 )
 
 func (g *Gossiper) LaunchVotation(question string, assetName string){
@@ -14,7 +13,7 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 	//Send symmetric key to all peers 
 		//What would be the message kind?
 		
-	debug.Debug("Launching votating")
+	//debug.Debug("Launching votating")
 	vs := model.VotationStatement{
 		Question: question,
 		Origin:	g.Name,
@@ -28,7 +27,7 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 		Signature: sign,
 	}
 	
-	debug.Debug("Checking votating correctness")
+	//debug.Debug("Checking votating correctness")
 	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
 	if !isValid {
         fmt.Println("Discarding Tx: " + errorMsg)
@@ -52,14 +51,14 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 	}
 	g.Blockchain.AssetsMutex.Unlock()
 	
-	debug.Debug("Sending symmetric to all peers")
+	//debug.Debug("Sending symmetric to all peers")
 	g.sendKeyToAllPeers(peers,key_str,vs.GetId())
 	
 }
 
 func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
 	//Get question corresponding to votation_id
-	debug.Debug("Answering vote question")
+	//debug.Debug("Answering vote question")
 	
 	votation_id := model.GetVotationId(question_subject,assetName,origin)
 	
@@ -68,7 +67,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	g.Blockchain.VoteStatementMutex.Unlock()
 	
 	if !questionExist{
-		log.Fatal("the question you'r trying to answer does not exist")
+		fmt.Println("the question you'r trying to answer does not exist")
 		return
 	}
 	
@@ -81,13 +80,13 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	g.QuestionKeyMutex.Unlock()
 	
 	if !ok {
-		log.Fatal("Fail to retreive the key to answer to this question")
+		fmt.Println("Fail to retreive the key to answer to this question")
 		return
 	}
 	
 	key_byte, err := hex.DecodeString(key)
 	if err != nil{
-		log.Fatal("Cannot decode key")
+		fmt.Println("Cannot decode key")
 		return
 	}
 	
@@ -96,7 +95,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	
 	if err != nil {
 		fmt.Println("Error during symmetric encryption")
-		log.Fatal(err)
+		return
 	}
 	
 	vaw := model.VotationAnswerWrapper{
@@ -115,7 +114,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	}
 	
 	//Send SendFileTx
-	debug.Debug("Checking correctness of vote answer")
+	//debug.Debug("Checking correctness of vote answer")
 	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
 	if !isValid {
         fmt.Println("Discarding Tx: " + errorMsg)
@@ -129,10 +128,12 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId string){	
 
 	for _,p := range peers{
-		pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+		if p != g.Name {
+			pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
 		
-		//ENCRYPT PRIVATE !!
-		g.SendPrivateMessage(pm)
+			//ENCRYPT PRIVATE !!
+			g.SendPrivateMessage(pm)
+		}
 	}
-	debug.Debug("Symmetric key for votation send to all shareholders")
+	//debug.Debug("Sending symmetric to all peers -> OK")
 }
