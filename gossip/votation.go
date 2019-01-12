@@ -13,7 +13,7 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 	//Send symmetric key to all peers 
 		//What would be the message kind?
 		
-	debug.Debug("Launching votating")
+	//debug.Debug("Launching votating")
 	vs := model.VotationStatement{
 		Question: question,
 		Origin:	g.Name,
@@ -27,7 +27,7 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 		Signature: sign,
 	}
 	
-	debug.Debug("Checking votating correctness")
+	//debug.Debug("Checking votating correctness")
 	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
 	if !isValid {
         fmt.Println("Discarding Tx: " + errorMsg)
@@ -51,14 +51,14 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 	}
 	g.Blockchain.AssetsMutex.Unlock()
 	
-	debug.Debug("Sending symmetric to all peers")
+	//debug.Debug("Sending symmetric to all peers")
 	g.sendKeyToAllPeers(peers,key_str,vs.GetId())
 	
 }
 
 func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
 	//Get question corresponding to votation_id
-	debug.Debug("Answering vote question")
+	//debug.Debug("Answering vote question")
 	
 	votation_id := model.GetVotationId(question_subject,assetName,origin)
 	
@@ -114,7 +114,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	}
 	
 	//Send SendFileTx
-	debug.Debug("Checking correctness of vote answer")
+	//debug.Debug("Checking correctness of vote answer")
 	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
 	if !isValid {
         fmt.Println("Discarding Tx: " + errorMsg)
@@ -135,5 +135,5 @@ func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId str
 			g.SendPrivateMessage(pm)
 		}
 	}
-	debug.Debug("Sending symmetric to all peers -> OK")
+	//debug.Debug("Sending symmetric to all peers -> OK")
 }

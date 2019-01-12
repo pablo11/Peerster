@@ -147,7 +147,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			//1. QuestionId does not exist
 			//2. Replier doesn't have shares in this asset
 			//3. Replier already answer this question
-			debug.Debug("Checking votation answer transaction correctness")
+
 			//1.
 			questionId := tx.VotationAnswerWrapper.GetVotationId()
 			
@@ -189,11 +189,10 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			b.VoteAnswersMutex.Unlock()
 			
 			if replierAlreadyAnswer {
-				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" already answer this question"
+				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" already answered this question"
 				isValid = false
 				return
 			}
-			debug.Debug("Checking votation answer transaction correctness -> OK")
 		
 		case tx.VotationStatement != nil:
 			//To be rejected, a votation statement:
@@ -201,7 +200,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			//2. Assetname doesn't exist
 			//3. Origin has no share in this asset
 			
-			debug.Debug("Checking votation statement transaction correctness")
+
 			
 			//1.
 			questionId := tx.VotationStatement.GetId()
@@ -235,7 +234,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 				return
 			}
 		
-			debug.Debug("Checking votation statement transaction correctness -> OK")
+
     }
     return
 }

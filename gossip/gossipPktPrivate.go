@@ -11,14 +11,14 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
     if gp.Private.Destination == g.Name {
         // If the private message is for this node, display it
         g.printGossipPacket("", fromAddrStr, gp)
-		debug.Debug("Received private message ")
+		//debug.Debug("Received private message ")
 		if checkPMWithKey(gp.Private.Text) {
 
 			key, question_id := getKeyFromPM(gp.Private.Text)
 			g.QuestionKeyMutex.Lock()
 			g.QuestionKey[question_id] = key
 			g.QuestionKeyMutex.Unlock()
-			debug.Debug("Received a symmetric key for question "+question_id)
+			//debug.Debug("Received a symmetric key for question "+question_id)
 		}
 		
     } else {
@@ -35,10 +35,10 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
 func checkPMWithKey (msg string) bool{
 	re := regexp.MustCompile("VOTATION KEY:.{64} QUESTION ID:.{64}")
 	if re.MatchString(msg) {
-		debug.Debug(msg + " is a votation key")
+		//debug.Debug(msg + " is a votation key")
 		return true
 	}
-	debug.Debug(msg + " isn't a votation key")
+	//debug.Debug(msg + " isn't a votation key")
 	return false
 }
 
