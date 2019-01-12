@@ -3,3 +3,29 @@
 .chat iframe {
     border: none;
 }
+
+#listAssets tr>th:last-child, tr>td:last-child {
+    text-align: right;
+}
+
+#listAssets tr>td:nth-child(2) {
+    font-weight: bold;
+}
+
+.float-right {
+    float: right;
+}
+
+.float-none {
+    float: none;
+    clear: both;
+}
+
+.modal-body h4 {
+    color: #999;
+}
+
+.modal-body h4>b {
+    color: #000;
+    font-size: 22px;
+}
