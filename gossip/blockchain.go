@@ -106,8 +106,8 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
         case tx.File != nil:
             // Check if I have already seen this transactions since the last block mined
             b.filenamesMutex.Lock()
-            _, filenameAlreadyCaimed := b.filenames[tx.File.Name]
-            if filenameAlreadyCaimed {
+            _, filenameAlreadyClaimed := b.filenames[tx.File.Name]
+            if filenameAlreadyClaimed {
                 b.filenamesMutex.Unlock()
                 errorMsg = "Filename already claimed"
                 isValid = false
@@ -117,8 +117,16 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 
 
         case tx.Identity != nil:
+            identityName := tx.Identity.Name
+            b.identitiesMutex.Lock()
+            _, identityAlreadyClaimed := b.identities[identityName]
+            b.identitiesMutex.Unlock()
 
-            // TODO: implement
+            if identityAlreadyClaimed {
+                errorMsg = "❗️ Cannot add the identity \"" + identityName + "\" because already claimed \n"
+                isValid = false
+                return
+            }
 
         case tx.ShareTx != nil:
             // Check if the two identities in the share transaction are in the blockchain and that the transaction is validly signed by the sender of the transaction
@@ -213,6 +221,23 @@ func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
     return true
 }
 
+func (b *Blockchain) validateBlockIdentities(txs []model.Transaction) bool {
+    tmpIds := make(map[string]bool)
+
+    for _, tx := range txs {
+        if tx.Identity != nil {
+            _, isThere := tmpIds[tx.Identity.Name]
+            if isThere {
+                return false
+            } else {
+                tmpIds[tx.Identity.Name] = true
+            }
+        }
+    }
+    return true
+}
+
+
 // This function assumes that the transaction and it's content is already validated (identities existence, valid signature, prevent doublespending)
 func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
     for _, tx := range txs {
@@ -303,7 +328,14 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
-    //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
+    // Validate transactions of type Identity
+    validIdentities := b.validateBlockIdentities(bp.Block.Transactions)
+    if !validIdentities {
+        fmt.Println("Invalid identity transactions")
+        return
+    }
+
+    fmt.Printf("🧩 NEW BLOCK \n\n")
 
     // Store block
     newBlock := bp.Block.Copy()
@@ -593,15 +625,6 @@ func (b *Blockchain) createBlockAndMine() *model.Block {
 }
 
 func (b *Blockchain) SendIdentityTx(identityName string) {
-    b.identitiesMutex.Lock()
-    _, isThere := b.identities[identityName]
-    b.identitiesMutex.Unlock()
-    if isThere {
-        fmt.Printf("❗️ Cannot add the identity \"%v\" because already claimed \n\n", identityName)
-        return
-    }
-
-
     newIdentity := &model.Identity{
 		Name: identityName,
 	}
@@ -619,19 +642,36 @@ func (b *Blockchain) SendIdentityTx(identityName string) {
 		newIdentity.SetPublicKey(&privateKey.PublicKey)
 	}
 
-	fmt.Printf("👤 New Identity - Name: %v \n", identityName)
-	//fmt.Printf("PrivateKey: Private Exponent=%v\n Prime factors=%v \n", privateKey.D, privateKey.Primes)
-	//fmt.Printf("PublicKey: Modulus=%v\n Public Exponent=%v \n", newIdentity.PublicKey.N, newIdentity.PublicKey.E)
 
-    // the first 25 chars are always the same
-    fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
-
-    // the first 19 chars are always the same
-    fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
-
-
-	tx := model.Transaction{
+	tx := &model.Transaction{
 		Identity: newIdentity,
 	}
-	b.SendTxPublish(&tx)
+
+    isValid, err := b.isValidTx(tx)
+    if isValid {
+        alreadyPending := b.isAlreadyPendingIdentity(newIdentity)
+
+        if !alreadyPending {
+            fmt.Printf("👤 New Identity - Name: %v \n", identityName)
+            fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
+            fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
+            b.SendTxPublish(tx)
+        } else {
+            fmt.Println("❗️ Cannot add the identity \"" + identityName + "\" because already in the pending pool\n")
+        }
+    } else {
+        fmt.Println(err)
+    }
+}
+
+
+func (b *Blockchain) isAlreadyPendingIdentity(newIdentity *model.Identity) bool {
+    for _, tx := range b.txsPool {
+        if tx.Identity != nil {
+            if tx.Identity.Name == newIdentity.Name {
+                return true
+            }
+        }
+    }
+    return false
 }
