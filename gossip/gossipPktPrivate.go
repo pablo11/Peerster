@@ -29,23 +29,16 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
         // If the private message is for this node, display it
         g.printGossipPacket("", fromAddrStr, gp)
 		//debug.Debug("Received private message ")
-<<<<<<< HEAD
-		if checkPMWithKey(gp.Private.Text) {
-	
-=======
-
 
         if checkPMWithKey(gp.Private.Text) {
-
->>>>>>> 56c56d720c2bbb38ad867469ebe3fbe50d7bbf32
 			key, question_id := getKeyFromPM(gp.Private.Text)
-	
+
 			g.Blockchain.VoteStatementMutex.Lock()
 			question, questionExist := g.Blockchain.VoteStatement[question_id]
 			g.Blockchain.VoteStatementMutex.Unlock()
-			
+
 			if questionExist && question.Origin == gp.Private.Origin {
-				
+
 				g.QuestionKeyMutex.Lock()
 				g.QuestionKey[question_id] = key
 				g.QuestionKeyMutex.Unlock()
