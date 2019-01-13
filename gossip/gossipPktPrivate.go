@@ -13,12 +13,13 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
         g.printGossipPacket("", fromAddrStr, gp)
 		//debug.Debug("Received private message ")
 		if checkPMWithKey(gp.Private.Text) {
-
+	
 			key, question_id := getKeyFromPM(gp.Private.Text)
 			g.QuestionKeyMutex.Lock()
 			g.QuestionKey[question_id] = key
 			g.QuestionKeyMutex.Unlock()
 			//debug.Debug("Received a symmetric key for question "+question_id)
+			
 		}
 		
     } else {
