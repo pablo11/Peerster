@@ -63,16 +63,17 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
     r.HandleFunc("/api/assets/list", a.ListAssets).Methods("GET")
 
     // Create new asset
-    r.HandleFunc("/api/assets/create", a.CreateAsset).Methods("POST")
+    r.HandleFunc("/api/asset/create", a.CreateAsset).Methods("POST")
 
     // Send assets shares
-    r.HandleFunc("/api/assets/send", a.SendShares).Methods("POST")
+    r.HandleFunc("/api/asset/send", a.SendShares).Methods("POST")
 
     // Get asset votes
-    r.HandleFunc("/api/assets/votes", a.GetAssetVotes).Methods("GET")
+    r.HandleFunc("/api/asset/votes", a.GetAssetVotes).Methods("GET")
 
     // Vote on asset vote
-    r.HandleFunc("/api/assets/vote", a.VoteOnAssetVote).Methods("POST")
+    r.HandleFunc("/api/asset/vote", a.VoteOnAssetVote).Methods("POST")
+
 
 
     // Post new votation

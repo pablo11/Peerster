@@ -1,5 +1,7 @@
 $(document).ready(function() {
     setupCreateNewAsset()
+    setupAssetDetailsModal()
+    setupSendShares()
 
 
     fetchAndDisplayMyAssets()
@@ -8,15 +10,9 @@ $(document).ready(function() {
     }, 2000)
 })
 
-function prepareModal(asset) {
-
-
-
-}
-
 function setupCreateNewAsset() {
     $('#create-asset-btn').click(function() {
-        $.post("api/assets/create", {
+        $.post("api/asset/create", {
             assetName: $("#createAssetName").val(),
             totSupply: $("#createAssetTotSuppl").val(),
         }, function(data, status) {
@@ -30,14 +26,34 @@ function setupCreateNewAsset() {
 
 function fetchAndDisplayMyAssets() {
     $.get("api/assets/list", function(assets, status) {
-        console.log(assets, status);
+        //console.log(assets, status);
 
         var html = ""
         for (assetName in assets) {
             var a = assets[assetName]
-            html += '<tr data-toggle="modal" data-target="#assetModal"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>'
+            html += '<tr class="assetRow" data-toggle="modal" data-target="#assetModal"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>'
         }
 
         $('#listAssetsRows').html(html)
+    })
+}
+
+function setupAssetDetailsModal() {
+    $('.assetRow').click(function() {
+        console.log("hello");
+    })
+}
+
+function setupSendShares() {
+    $('#send-shares-btn').click(function() {
+        $.post("api/asset/send", {
+            amount: $("#sendAssetAmount").val(),
+            dest: $("#sendAssetDest").val(),
+            assetName: $('#modalAssetName').html(),
+        }, function(data, status) {
+            window.alert("Your transaction was submitted to the blockchain. It'll be executed if valid.")
+        })
+
+        $("#assetModal").modal("hide")
     })
 }
