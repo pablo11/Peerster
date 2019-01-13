@@ -304,37 +304,37 @@ func (a *ApiHandler) VotationCreate(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(400)
         return
     }
-	
+
 	//Check for correctness will be done in votation
 	 go a.gossiper.LaunchVotation(question[0],asset[0])
 }
 
 func (a *ApiHandler) Votations(w http.ResponseWriter, r *http.Request) {
-	
+
 	a.gossiper.Blockchain.VoteStatementMutex.Lock()
 	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
 	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
 	a.gossiper.Blockchain.AssetsMutex.Lock()
 	assetsMap := a.gossiper.Blockchain.Assets //Same here
 	a.gossiper.Blockchain.AssetsMutex.Unlock()
-	
-	
+
+
 	var jsonFiles []string
 
-	for asset,vs := range voteStatements {
+	for _, vs := range voteStatements {
 		haveTheAsset := false
 		//Only send question for assets you have
-		for shareholders,shares := range assetsMap[asset] {
+		for shareholders,shares := range assetsMap[vs.AssetName] {
 			if shareholders == a.gossiper.Name && shares > 0{
 				haveTheAsset = true
 			}
 		}
-		
+
 		if haveTheAsset {
 			jsonFiles = append(jsonFiles,"{\"question\":\"" + vs.Question + "\", \"origin\":\"" + vs.Origin + "\", \"asset\":\"" + vs.AssetName +"\"}")
 		}
 	}
-	
+
 	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
 }
 
@@ -350,28 +350,28 @@ func (a *ApiHandler) VotationReply(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(400)
         return
     }
-	
+
 	if !isOriginPresent || len(origin) < 1 || origin[0] == "" || !isAnswerPresent || len(answer) < 1 || answer[0] == ""{
         w.Header().Set("Server", "Cryptop GO server")
         w.WriteHeader(400)
         return
     }
-	
+
 	answer_bool, err := strconv.ParseBool(answer[0])
 	if err != nil {
 		w.Header().Set("Server", "Cryptop GO server")
         w.WriteHeader(400)
         return
 	}
-	
+
 	//Check for correctness will be done in votation
 	 go a.gossiper.AnswerVotation(question[0], asset[0], origin[0], answer_bool)
 }
 
 func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
-	
+
 	//reply only answers for votating I'm in
-	
+
 	a.gossiper.Blockchain.VoteStatementMutex.Lock()
 	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
 	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
@@ -381,20 +381,19 @@ func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
 	a.gossiper.Blockchain.VoteAnswersMutex.Lock()
 	voteAnswers := a.gossiper.Blockchain.VoteAnswers //Same here
 	a.gossiper.Blockchain.VoteAnswersMutex.Unlock()
-	
+
 	var jsonFiles []string
-	
-	for asset,vs := range voteStatements {
+
+	for question_id, vs := range voteStatements {
 		haveTheAsset := false
 		//Only send question for assets you have
-		for shareholders,shares := range assetsMap[asset] {
+		for shareholders,shares := range assetsMap[vs.AssetName] {
 			if shareholders == a.gossiper.Name && shares > 0{
 				haveTheAsset = true
 			}
 		}
-		
+
 		if haveTheAsset {
-			question_id := vs.GetId()
 			holderNames, votationAnswerExists := voteAnswers[question_id]
 			a.gossiper.QuestionKeyMutex.Lock()
 			key, keyExists := a.gossiper.QuestionKey[question_id]
@@ -417,6 +416,6 @@ func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	
+
 	sendJSON(w, []byte(`[` + strings.Join(jsonFiles, ",") + `]`))
 }

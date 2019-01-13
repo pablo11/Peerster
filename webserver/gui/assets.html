@@ -23,6 +23,11 @@
 </head>
 
 <body>
+
+    <div id="particles-js"></div>
+    <script src="http://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="js/particles-js.js"></script>
+
     <div class="container">
         <nav class="navbar navbar-inverse mt-10">
             <div class="container-fluid">
@@ -72,15 +77,15 @@
 
 
     <div id="assetModal" class="modal fade assetModal" role="dialog">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
 
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <h2 class="modal-title">Acer</h2>
-                    <h4>You have <b>43</b> shares of this asset over a total supply of 1'500.</h4>
+                    <h2 class="modal-title" id="modalAssetName">Acer</h2>
+                    <h4>You have <b id="modalAssetBalance"></b> shares of this asset over a total supply of <span id="modalAssetTotSupply"></span>.</h4>
 
                     <hr />
 
@@ -130,21 +135,13 @@
                                     <thead>
                                         <tr>
                                             <th>Question</th>
-                                            <th>Positive/negative votes</th>
-                                            <th></th>
+                                            <th>Yes/No votes</th>
+                                            <th>Proposed by</th>
+                                            <th>Vote</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>Fire CEO?</td>
-                                            <td>3/1</td>
-                                            <td><button class="btn btn-success btn-xs">vote</button></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Invest in crypto</td>
-                                            <td>4/0</td>
-                                            <td><button class="btn btn-success btn-xs">vote</button></td>
-                                        </tr>
+                                    <tbody id="assetModalListVotes">
+
                                     </tbody>
                                 </table>
                             </div>
@@ -183,6 +180,51 @@
                     <div class="row">
                         <div class="col-sm-12">
                             <p class="mb-0 mt-10">* the whole supply will be accredited to you upon asset creation</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="registerIdentityModal" class="modal fade" role="dialog">
+        <div class="modal-dialog modal-lg">
+
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-12 mt-50">
+                            <h2>Your identity is not in the blockchain yet</h2>
+                        </div>
+
+                        <div class="col-sm-12 mt-50 mb-50" style="text-align:center;">
+                            <button id="claimIdentityBtn" class="btn btn-lg btn-primary">
+                                <h2 class="claimIdentityBtnTitle mt-10">Claim identity!</h2>
+                                <div class="claimIdentityBtnLoader" title="4">
+                                    <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+                                    width="24px" height="30px" viewBox="0 0 24 30" style="enable-background:new 0 0 50 50;" xml:space="preserve">
+                                        <rect x="0" y="0" width="4" height="10" fill="#333">
+                                            <animateTransform attributeType="xml"
+                                            attributeName="transform" type="translate"
+                                            values="0 0; 0 20; 0 0"
+                                            begin="0" dur="0.6s" repeatCount="indefinite" />
+                                        </rect>
+                                        <rect x="10" y="0" width="4" height="10" fill="#333">
+                                            <animateTransform attributeType="xml"
+                                            attributeName="transform" type="translate"
+                                            values="0 0; 0 20; 0 0"
+                                            begin="0.2s" dur="0.6s" repeatCount="indefinite" />
+                                        </rect>
+                                        <rect x="20" y="0" width="4" height="10" fill="#333">
+                                            <animateTransform attributeType="xml"
+                                            attributeName="transform" type="translate"
+                                            values="0 0; 0 20; 0 0"
+                                            begin="0.4s" dur="0.6s" repeatCount="indefinite" />
+                                        </rect>
+                                    </svg>
+                                </div>
+                            </button>
                         </div>
                     </div>
                 </div>

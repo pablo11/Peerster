@@ -58,21 +58,32 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
 
 
 
+    // Check if my identity is on the blockchain
+    r.HandleFunc("/api/identity/check", a.CheckIdentity).Methods("GET")
+
+    // Check if my identity is on the blockchain
+    r.HandleFunc("/api/identity/register", a.RegisterIdentity).Methods("GET")
+
+
 
     // List assets
     r.HandleFunc("/api/assets/list", a.ListAssets).Methods("GET")
 
     // Create new asset
-    r.HandleFunc("/api/assets/create", a.CreateAsset).Methods("POST")
+    r.HandleFunc("/api/asset/create", a.CreateAsset).Methods("POST")
 
     // Send assets shares
-    r.HandleFunc("/api/assets/send", a.SendShares).Methods("POST")
+    r.HandleFunc("/api/asset/send", a.SendShares).Methods("POST")
 
     // Get asset votes
-    r.HandleFunc("/api/assets/votes", a.GetAssetVotes).Methods("GET")
+    r.HandleFunc("/api/asset/votes", a.GetAssetVotes).Methods("GET")
+
+    // Create new vote on asset
+    r.HandleFunc("/api/asset/newVote", a.CreateAssetVote).Methods("POST")
 
     // Vote on asset vote
-    r.HandleFunc("/api/assets/vote", a.VoteOnAssetVote).Methods("POST")
+    r.HandleFunc("/api/asset/vote", a.VoteOnAssetVote).Methods("POST")
+
 
 
     // Post new votation

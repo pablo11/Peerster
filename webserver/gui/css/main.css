@@ -12,6 +12,10 @@
     font-weight: bold;
 }
 
+#listAssetVotes tr>th:last-child, tr>td:last-child {
+    text-align: right;
+}
+
 .float-right {
     float: right;
 }
@@ -28,4 +32,20 @@
 .modal-body h4>b {
     color: #000;
     font-size: 22px;
+}
+
+#registerIdentityModal h2, button {
+    text-align: center;
+}
+
+svg path,
+svg rect{
+  fill: #fff;
+}
+
+#particles-js {
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    z-index: -1;
 }

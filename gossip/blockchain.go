@@ -36,7 +36,7 @@ type Blockchain struct {
 	// Mapping of identities in the blockchain [k: Name => v: Identity]
 	identities      map[string]*model.Identity
 	identitiesMutex sync.Mutex
-	
+
 	// Mapping of question_id a VotationStatement in the blockchain [k: question_id => v: *VotationStatement]
     VoteStatement map[string]*model.VotationStatement
     VoteStatementMutex sync.Mutex
@@ -103,6 +103,57 @@ func (b *Blockchain) GetMyAssetsJson() string {
 	b.AssetsMutex.Unlock()
 
 	return `{` + strings.Join(myAssetsStr, ",") + `}`
+}
+
+func (b * Blockchain) IsMyIdOnBlockchain() bool {
+	b.identitiesMutex.Lock()
+	identity, isPresent := b.identities[b.gossiper.Name]
+	b.identitiesMutex.Unlock()
+
+	if !isPresent {
+		return false
+	}
+
+	return identity.Name == b.gossiper.Name && model.PublicKeyString(identity.PublicKeyObj()) == model.PublicKeyString(&b.gossiper.PrivateKey.PublicKey)
+}
+
+func (b *Blockchain) GetAssetVotesJson(assetName string) string {
+	votesStr := make([]string, 0)
+
+	b.VoteStatementMutex.Lock()
+	voteStatements := b.VoteStatement
+	b.VoteStatementMutex.Unlock()
+	for questionId, q := range voteStatements {
+		if q.AssetName == assetName {
+			b.VoteAnswersMutex.Lock()
+			answers, areAvailable := b.VoteAnswers[questionId]
+			b.VoteAnswersMutex.Unlock()
+			answersStr := make([]string, 0)
+			if areAvailable {
+				for assetHolder, voteAnswerWrapper := range answers {
+					questionKey, isPresent := b.gossiper.QuestionKey[questionId]
+					if isPresent {
+						byteKey, err := hex.DecodeString(questionKey)
+						if err == nil {
+							decryptedAnswer, err := voteAnswerWrapper.Decrypt(byteKey)
+							if err == nil {
+								holderAnswer := "\"" + assetHolder + "\":"
+								if decryptedAnswer.Answer {
+									holderAnswer += "\"yes\""
+								} else {
+									holderAnswer += "\"no\""
+								}
+								answersStr = append(answersStr, holderAnswer)
+							}
+						}
+					}
+				}
+			}
+
+			votesStr = append(votesStr, "\"" + questionId + "\":{\"question\":\"" + q.Question + "\", \"origin\":\"" + q.Origin + "\", \"answers\":{" + strings.Join(answersStr, ",") + "}}")
+		}
+	}
+	return `{` + strings.Join(votesStr, ",") + `}`
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
@@ -265,7 +316,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 				isValid = false
 				return
 			}
-		
+
 
     }
     return
