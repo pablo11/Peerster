@@ -89,7 +89,7 @@ func (b *Blockchain) SetGossiper(g *Gossiper) {
 func (b *Blockchain) GetMyAssetsJson() string {
 	myAssetsStr := make([]string, 0)
 	b.AssetsMutex.Lock()
-    for assetName, assetOwnership := range b.assets {
+    for assetName, assetOwnership := range b.Assets {
         amount, nonzero := assetOwnership[b.gossiper.Name]
 		if nonzero {
 			var totalSupply uint64 = 0
@@ -100,7 +100,7 @@ func (b *Blockchain) GetMyAssetsJson() string {
 			myAssetsStr = append(myAssetsStr, "\"" + assetName + "\":{\"balance\":" + strconv.Itoa(int(amount)) + ",\"totSupply\":" + strconv.Itoa(int(totalSupply)) + "}")
 		}
     }
-	b.assetsMutex.Unlock()
+	b.AssetsMutex.Unlock()
 
 	return `{` + strings.Join(myAssetsStr, ",") + `}`
 }
