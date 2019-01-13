@@ -639,6 +639,11 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 				b.VoteStatementMutex.Lock()
 				b.VoteStatement[questionId] = &vsCopy
 				b.VoteStatementMutex.Unlock()
+				
+				if vsCopy.Origin == b.gossiper.Name {
+					go b.gossiper.sendKeyToAllPeers(questionId, vsCopy.AssetName)
+				}
+				
         }
     }
 

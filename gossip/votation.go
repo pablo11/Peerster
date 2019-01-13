@@ -34,26 +34,6 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
         return
     }
 	g.Blockchain.SendTxPublish(&tx)
-
-	key := make([]byte, 32)
-	rand.Read(key)
-
-	key_str := hex.EncodeToString(key)
-	g.QuestionKeyMutex.Lock()
-	g.QuestionKey[vs.GetId()] = key_str
-	g.QuestionKeyMutex.Unlock()
-
-	var peers []string
-	//Send to all shareholders
-	g.Blockchain.AssetsMutex.Lock()
-	for p,_ := range g.Blockchain.Assets[assetName]{
-		peers = append(peers, p) //Assume that peer with asset 0 have been removed
-	}
-	g.Blockchain.AssetsMutex.Unlock()
-
-	//debug.Debug("Sending symmetric to all peers")
-	g.sendKeyToAllPeers(peers,key_str,vs.GetId())
-
 }
 
 func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
@@ -125,11 +105,27 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	//move from pending to completed? => This is done in GUI
 }
 
-func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId string){
+func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
+
+	key := make([]byte, 32)
+	rand.Read(key)
+
+	key_str := hex.EncodeToString(key)
+	g.QuestionKeyMutex.Lock()
+	g.QuestionKey[questionId] = key_str
+	g.QuestionKeyMutex.Unlock()
+	
+	var peers []string
+	//Send to all shareholders
+	g.Blockchain.AssetsMutex.Lock()
+	for p,_ := range g.Blockchain.Assets[assetName]{
+		peers = append(peers, p) //Assume that peer with asset 0 have been removed
+	}
+	g.Blockchain.AssetsMutex.Unlock()
 
 	for _,p := range peers{
 		if p != g.Name {
-			pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+			pm := model.NewPrivateMessage(g.Name, createPMWithKey(key_str,questionId), p)
 
 			//ENCRYPT PRIVATE !!
 			g.SendPrivateMessage(pm)
