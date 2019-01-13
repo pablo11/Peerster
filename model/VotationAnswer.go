@@ -65,13 +65,8 @@ func (vaw *VotationAnswerWrapper) GetVotationId() string{
 }
 
 func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
-<<<<<<< HEAD
 	//debug.Debug("Trying to decrypt votationAnswer with symmetric key")
-	
-=======
-	debug.Debug("Trying to decrypt votationAnswer with symmetric key")
 
->>>>>>> signing
 	ciphertext := vaw.Answer
 
 	var va_decoded VotationAnswer
@@ -108,15 +103,9 @@ func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
 		//debug.Debug("Votation Answer didn't deserialized with protobuf")
         return va_decoded, err
     }
-<<<<<<< HEAD
-	
+
 	//debug.Debug("Decryption votation Answer worked!")
-	
-=======
 
-	debug.Debug("Decryption votation Answer worked!")
-
->>>>>>> signing
 	return va_decoded,err
 }
 
@@ -146,15 +135,9 @@ func (va *VotationAnswer) String() string {
 
 
 func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
-<<<<<<< HEAD
 	//debug.Debug("Trying to encrypt votationAnswer with symmetric key")
-	va_encoded, err := protobuf.Encode(va) 
-	
-=======
-	debug.Debug("Trying to encrypt votationAnswer with symmetric key")
 	va_encoded, err := protobuf.Encode(va)
 
->>>>>>> signing
 
     c, err := aes.NewCipher(key)
     if err != nil {
