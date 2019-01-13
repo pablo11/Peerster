@@ -36,13 +36,8 @@ type Blockchain struct {
 	// Mapping of identities in the blockchain [k: Name => v: Identity]
 	identities      map[string]*model.Identity
 	identitiesMutex sync.Mutex
-<<<<<<< HEAD
 	
 	// Mapping of question_id a VotationStatement in the blockchain [k: question_id => v: *VotationStatement]
-=======
-
-	// Mapping of assetName to array of VotationStatement in the blockchain [k: assetName => v: *VotationStatement]
->>>>>>> asset-digitization
     VoteStatement map[string]*model.VotationStatement
     VoteStatementMutex sync.Mutex
 
