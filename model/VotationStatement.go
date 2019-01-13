@@ -11,12 +11,13 @@ type VotationStatement struct{
 	AssetName	string
 }
 
-func (vs *VotationStatement) Hash() []byte{
+func (vs *VotationStatement) Hash()  (out [32]byte) {
 	sha_256 := sha256.New()
 	sha_256.Write([]byte(vs.Question))
 	sha_256.Write([]byte(vs.Origin))
 	sha_256.Write([]byte(vs.AssetName))
-	return sha_256.Sum(nil)
+    copy(out[:], sha_256.Sum(nil))
+    return
 }
 
 func (vs *VotationStatement) Copy() VotationStatement {
@@ -25,16 +26,17 @@ func (vs *VotationStatement) Copy() VotationStatement {
 		Origin:	vs.Origin,
 		AssetName: vs.AssetName,
 	}
-	
+
 	return new_vs
-} 
+}
 
 func (vs *VotationStatement) String() string {
     return "VOTATION_STATEMENT= FROM " + vs.Origin +" QUESTION "+vs.Question +" FOR ASSET "+vs.AssetName
 }
 
 func (vs *VotationStatement) GetId() string{
-	return hex.EncodeToString(vs.Hash())
+    hash := vs.Hash()
+	return hex.EncodeToString(hash[:])
 }
 
 func GetVotationId(question string, assetName string, origin string) string{
@@ -43,5 +45,6 @@ func GetVotationId(question string, assetName string, origin string) string{
 		Origin:	origin,
 		AssetName: assetName,
 	}
-	return hex.EncodeToString(new_vs.Hash())
+    hash := new_vs.Hash()
+	return hex.EncodeToString(hash[:])
 }
