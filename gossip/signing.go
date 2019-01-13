@@ -127,5 +127,9 @@ func (b *Blockchain) VerifyTx(tx *model.Transaction) bool {
 
 func (b *Blockchain) VerifyPrivateMessage(pm *model.PrivateMessage) bool {
     cyptherBytes := pm.IntegrityHash()
-    return b.Verify(pm.Signature, cyptherBytes[:])
+    correctSignature := b.Verify(pm.Signature, cyptherBytes[:])
+
+    correctSigner := pm.Origin == pm.Signature.Name
+
+    return correctSignature && correctSigner
 }

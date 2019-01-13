@@ -12,7 +12,6 @@ import (
 func (g *Gossiper) LaunchVotation(question string, assetName string){
 	//Create and put TxVotationStatement in pending Blocks
 	//Send symmetric key to all peers
-		//What would be the message kind?
 
 	//debug.Debug("Launching votating")
 	vs := model.VotationStatement{
@@ -36,20 +35,11 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
         return
     }
 
-
     txCopy := tx.Copy()
 
     fmt.Println("Creating Votation tx hash: " + txCopy.HashStr())
 
 	g.Blockchain.SendTxPublish(&txCopy)
-
-
-    /*debug.Debug("Votation tx hash: " + txCopy.HashStr())
-    bytevote := txCopy.VotationStatement.Hash()
-    debug.Debug("Votation question hash: " + hex.EncodeToString(bytevote[:]))
-    debug.Debug("Votation signature check: ")
-    txCopy.Signature.PrintSignature()*/
-
 
 	key := make([]byte, 32)
 	rand.Read(key)
@@ -83,7 +73,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	g.Blockchain.VoteStatementMutex.Unlock()
 
 	if !questionExist{
-		fmt.Println("the question you'r trying to answer does not exist")
+		fmt.Println("❌ The question you'are trying to answer does not exist")
 		return
 	}
 
@@ -148,8 +138,8 @@ func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId str
 	for _,p := range peers{
 		if p != g.Name {
 			pm := g.NewEncryptedPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+            g.SignPrivateMessage(pm)
 
-			//ENCRYPT PRIVATE !!
 			g.SendPrivateMessage(pm)
 		}
 	}

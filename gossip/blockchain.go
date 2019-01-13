@@ -704,7 +704,7 @@ func (b *Blockchain) printBlockchain(headHash string) {
 	}
 	b.blocksMutex.RUnlock()
 
-	fmt.Println("⛓ CHAIN" + chainStr + "\n")
+	fmt.Println("⛓  CHAIN" + chainStr + "\n")
 }
 
 func (b *Blockchain) printAssetsOwnership() {
@@ -719,7 +719,7 @@ func (b *Blockchain) printAssetsOwnership() {
 	}
 	b.AssetsMutex.Unlock()
 
-	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
+	fmt.Println("🗂  ASSET OWNERSHIP:\n" + toPrint)
 }
 
 func (b *Blockchain) printVotings() {
@@ -760,6 +760,7 @@ func (b *Blockchain) printVotings() {
 
 				bool_str = strconv.FormatBool(ans_decrypted.Answer)
 			}
+
 			toPrint += "\n---" + voteReplier +" "+ bool_str
 		}
 		toPrint += "\n"
@@ -767,7 +768,7 @@ func (b *Blockchain) printVotings() {
 
 	b.VoteAnswersMutex.Unlock()
 
-	fmt.Println("VOTATIONS:\n" + toPrint)
+	fmt.Println("🙋🏻‍♂️ VOTATIONS:\n" + toPrint)
 }
 
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {

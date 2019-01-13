@@ -35,7 +35,8 @@ func (g *Gossiper) Encrypt(data []byte, publicKey *rsa.PublicKey) []byte {
         return nil
     }
 
-    fmt.Printf("🔒EncryptedData: %x\n", encryptedData)
+    //fmt.Printf("🔒 Data Encrypted: %x\n", encryptedData)
+    fmt.Printf("🔒 Data Encrypted\n")
 
     return encryptedData
 }
@@ -63,37 +64,6 @@ func (g *Gossiper) NewEncryptedPrivateMessage(origin, text, dest string) *model.
     }
 }
 
-/*
-func (g *Gossiper) NewRSAPrivateMessage(origin, text, dest string, isEncrypted, isSigned bool) *model.PrivateMessage {
-    g.Blockchain.identitiesMutex.Lock()
-    toIdentity, isToIdentifiable := g.Blockchain.identities[dest]
-    fromIdentity, isFromIdentifiable := g.Blockchain.identities[origin]
-    g.Blockchain.identitiesMutex.Unlock()
-    if !isToIdentifiable  {
-        fmt.Printf("❓👤 Destination Identity not available in the blockchain\n")
-        return nil
-    }
-
-    if !isFromIdentifiable  {
-        fmt.Printf("❓👤 Origin Identity not available in the blockchain\n")
-        return nil
-    }
-
-    cypherBytes := g.Encrypt([]byte(text), toIdentity.PublicKeyObj())
-    cypherText := string(cypherBytes[:])
-
-    Sign(data [32]byte)
-
-    return &model.PrivateMessage{
-        Origin: origin,
-        ID: 0,
-        Text: cypherText,
-        Destination: dest,
-        HopLimit: 10,
-        IsEncrypted: isEncrypted,
-        IsSigned: isSigned,
-    }
-}*/
 
 
 // ===== Decrypt =====
@@ -108,7 +78,8 @@ func (g *Gossiper) Decrypt(encryptedData []byte) []byte {
         return nil
     }
 
-    fmt.Printf("🔓 Plain Bytes: %s\n", string(plainBytes))
+    //fmt.Printf("🔓 Date Decrypted: %s\n", string(plainBytes))
+    fmt.Printf("🔓 Data Decrypted\n")
 
     return plainBytes
 }
