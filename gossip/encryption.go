@@ -6,9 +6,8 @@ import (
     "crypto/rsa"
     "crypto/rand"
     "crypto/sha256"
+    "github.com/pablo11/Peerster/model"
 )
-
-
 
 // ========================= Encryption =======================
 
@@ -17,7 +16,7 @@ func NewPrivateKey() *rsa.PrivateKey {
 
     privateKey, err := rsa.GenerateKey(rng, 2048)
     if err != nil {
-        fmt.Printf("Bad private key: %v\n", err)
+        fmt.Printf("❌ Bad private key: %v\n", err)
         return nil
     }
 
@@ -32,17 +31,29 @@ func (g *Gossiper) Encrypt(data []byte, publicKey *rsa.PublicKey) []byte {
 
     encryptedData, err := rsa.EncryptOAEP(sha256.New(), rng, publicKey, data, label)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "Error encrypting data: %v\n", err)
+        fmt.Fprintf(os.Stderr, "❌🔒 Error encrypting data: %v\n", err)
         return nil
     }
 
-    //fmt.Printf("EncryptedData: %x\n", encryptedData)
+    fmt.Printf("🔒EncryptedData: %x\n", encryptedData)
 
     return encryptedData
 }
 
-// TODO: func Encrypt for each transaction type
 
+func (g *Gossiper) NewEncryptedPrivateMessage(origin, text, dest string) *model.PrivateMessage {
+    g.Blockchain.identitiesMutex.Lock()
+    toIdentity, isIdentifiable := g.Blockchain.identities[dest]
+    g.Blockchain.identitiesMutex.Unlock()
+    if !isIdentifiable {
+        fmt.Printf("❓👤 Identity not available in the blockchain\n")
+        return nil
+    }
+
+    cypherBytes := g.Encrypt([]byte(text), toIdentity.PublicKeyObj())
+    cypherText := string(cypherBytes[:])
+    return model.NewPrivateMessage(origin, cypherText, dest)
+}
 
 
 // ===== Decrypt =====
@@ -53,18 +64,13 @@ func (g *Gossiper) Decrypt(encryptedData []byte) []byte {
 
     plainData, err := rsa.DecryptOAEP(sha256.New(), rng, g.PrivateKey, encryptedData, label)
     if err != nil {
-        fmt.Fprintf(os.Stderr, "Error from decryption: %s\n", err)
+        fmt.Fprintf(os.Stderr, "❌🔓 Error from decryption: %s\n", err)
         return nil
     }
 
-    fmt.Printf("Plain Data: %s\n", string(plainData))
+    fmt.Printf("🔓 Plain Data: %s\n", string(plainData))
 
     return plainData
 }
-
-// TODO: func Decrypt for each transaction type
-
-
-
 
 // QUESTION: should we encrypt messages as well?

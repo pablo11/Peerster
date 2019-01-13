@@ -23,6 +23,10 @@ func main() {
     identity := flag.String("identity", "", "Identity on the blockchain")
 	question := flag.String("question", "", "Question for vote")
 	assetVote:= flag.String("assetVote", "", "Asset on which vote is done")
+	origin := flag.String("origin", "", "Origin node of the vote")
+	answer := flag.Bool("answer", false, "Answer to the vote")
+    sign := flag.Bool("sign", false, "Send signed content")
+    encrypt := flag.Bool("encrypt", false, "Send encrypted content")
 
     flag.Parse()
 
@@ -55,6 +59,8 @@ func main() {
             File: *file,
             Request: *request,
             Dest: *dest,
+            Sign: *sign,
+            Encrypt: *encrypt,
         }
         sendPacket(cm, *uiPort)
         return
@@ -66,6 +72,8 @@ func main() {
             Type: "msg",
             Text: *msg,
             Dest: *dest,
+            Sign: *sign,
+            Encrypt: *encrypt,
         }
         sendPacket(cm, *uiPort)
         return
@@ -82,6 +90,7 @@ func main() {
         return
     }
 
+    // Send/Create an asset
     if *asset != "" && *dest != "" {
         if uint64(*amount) <= 0 {
             fmt.Println("Invalid amount of asset (it must be > 0)")
@@ -97,7 +106,21 @@ func main() {
             return
         }
     }
-	
+
+    // Answer a poll
+	if *question != "" && *assetVote != "" && *origin != ""{
+		cm := &model.ClientMessage{
+            Type: "voteAnswer",
+            Text: *question,
+            Asset: *assetVote,
+			Origin: *origin,
+			Answer: *answer,
+        }
+        sendPacket(cm, *uiPort)
+        return
+	}
+
+    // Launch a poll
 	if *question != "" && *assetVote != "" {
 		cm := &model.ClientMessage{
             Type: "vote",
@@ -107,6 +130,8 @@ func main() {
         sendPacket(cm, *uiPort)
         return
 	}
+
+	
 
     fmt.Println("Please provide some valid parameters")
 }

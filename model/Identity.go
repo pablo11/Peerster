@@ -3,6 +3,7 @@ package model
 import (
 	"crypto/rsa"
     "fmt"
+    "encoding/hex"
 	"crypto/sha256"
     "crypto/x509"
 	"encoding/binary"
@@ -20,6 +21,12 @@ func (i *Identity) Hash() (out [32]byte) {
 	h.Write(i.PublicKey)
 	copy(out[:], h.Sum(nil))
 	return
+}
+
+func (i *Identity) HashStr() string {
+    fixOut := i.Hash()
+    out := fixOut[:]
+	return hex.EncodeToString(out)
 }
 
 func (i *Identity) String() string {

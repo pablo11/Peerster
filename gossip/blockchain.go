@@ -153,12 +153,18 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
     errorMsg = ""
     isValid = true
 
+    if !b.VerifyTx(tx) {
+        errorMsg = "Invalid Signature"
+        isValid = false
+        return
+    }
+
     switch {
         case tx.File != nil:
             // Check if I have already seen this transactions since the last block mined
             b.filenamesMutex.Lock()
-            _, filenameAlreadyCaimed := b.filenames[tx.File.Name]
-            if filenameAlreadyCaimed {
+            _, filenameAlreadyClaimed := b.filenames[tx.File.Name]
+            if filenameAlreadyClaimed {
                 b.filenamesMutex.Unlock()
                 errorMsg = "Filename already claimed"
                 isValid = false
@@ -168,19 +174,27 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 
 
         case tx.Identity != nil:
+            identityName := tx.Identity.Name
+            b.identitiesMutex.Lock()
+            _, identityAlreadyClaimed := b.identities[identityName]
+            b.identitiesMutex.Unlock()
 
-            // TODO: implement
+            if identityAlreadyClaimed {
+                errorMsg = "❗️ Cannot add the identity \"" + identityName + "\" because already claimed \n"
+                isValid = false
+                return
+            }
 
         case tx.ShareTx != nil:
             // Check if the two identities in the share transaction are in the blockchain and that the transaction is validly signed by the sender of the transaction
-            isValid, errorMsg = b.isShareTxValidlySigned(tx.ShareTx)
+            isValid, errorMsg = b.isShareTxValidlySigned(tx)
 
 		case tx.VotationAnswerWrapper != nil:
 			//To be rejected, a votation answer wrapped:
 			//1. QuestionId does not exist
 			//2. Replier doesn't have shares in this asset
 			//3. Replier already answer this question
-			debug.Debug("Checking votation answer transaction correctness")
+
 			//1.
 			questionId := tx.VotationAnswerWrapper.GetVotationId()
 
@@ -222,19 +236,16 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 			b.VoteAnswersMutex.Unlock()
 
 			if replierAlreadyAnswer {
-				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" already answer this question"
+				errorMsg = "The replier "+tx.VotationAnswerWrapper.Replier+" already answered this question"
 				isValid = false
 				return
 			}
-			debug.Debug("Checking votation answer transaction correctness -> OK")
 
 		case tx.VotationStatement != nil:
 			//To be rejected, a votation statement:
 			//1. is already present with same questionID
 			//2. Assetname doesn't exist
 			//3. Origin has no share in this asset
-
-			debug.Debug("Checking votation statement transaction correctness")
 
 			//1.
 			questionId := tx.VotationStatement.GetId()
@@ -268,29 +279,32 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 				return
 			}
 
-			debug.Debug("Checking votation statement transaction correctness -> OK")
+
     }
     return
 }
 
-func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, errorMsg string) {
+func (b *Blockchain) isShareTxValidlySigned(tx *model.Transaction) (isValid bool, errorMsg string) {
     errorMsg = ""
     isValid = true
+    isValidSignature := true
 
     // Make sure that the sender (From) and destinatary (To) identities are in the blockchain
-	if st.From != "" {
+	if tx.ShareTx.From != "" {
 		b.identitiesMutex.Lock()
-	    _ /*fromIdentity*/, isFromRegistered := b.identities[st.From]
+	    fromIdentity, isFromRegistered := b.identities[tx.ShareTx.From]
 	    b.identitiesMutex.Unlock()
 		if !isFromRegistered {
 			errorMsg = "No identities found for the sender of the share transaction"
 	        isValid = false
 	        return
 		}
+
+        isValidSignature = tx.Signature.Name == fromIdentity.Name
 	}
 
 	b.identitiesMutex.Lock()
-    _ /*toIdentity*/, isToRegistered := b.identities[st.To]
+    toIdentity, isToRegistered := b.identities[tx.ShareTx.To]
     b.identitiesMutex.Unlock()
     if !isToRegistered {
         errorMsg = "No identities found for the destinatary of the share transaction"
@@ -298,9 +312,10 @@ func (b *Blockchain) isShareTxValidlySigned(st *model.ShareTx) (isValid bool, er
         return
     }
 
-    // Validate signature with the identity of the sender (From)
+    if tx.ShareTx.From == "" {
+        isValidSignature = tx.Signature.Name == toIdentity.Name
+    }
 
-    isValidSignature := true // TODO: need to check the signature against the sender identity
 
     if !isValidSignature {
         errorMsg = "Invalid signature of share transaction"
@@ -368,6 +383,23 @@ func (b *Blockchain) validateBlockShareTxs(txs []model.Transaction) bool {
     }
     return true
 }
+
+func (b *Blockchain) validateBlockIdentities(txs []model.Transaction) bool {
+    tmpIds := make(map[string]bool)
+
+    for _, tx := range txs {
+        if tx.Identity != nil {
+            _, isThere := tmpIds[tx.Identity.Name]
+            if isThere {
+                return false
+            } else {
+                tmpIds[tx.Identity.Name] = true
+            }
+        }
+    }
+    return true
+}
+
 
 // This function assumes that the transaction and it's content is already validated (identities existence, valid signature, prevent doublespending)
 func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
@@ -460,7 +492,14 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
-    //fmt.Printf("🧩 NEW BLOCK %+v\n\n", bp)
+    // Validate transactions of type Identity
+    validIdentities := b.validateBlockIdentities(bp.Block.Transactions)
+    if !validIdentities {
+        fmt.Println("Invalid identity transactions")
+        return
+    }
+
+    fmt.Printf("🔗 NEW BLOCK \n\n")
 
     // Store block
     newBlock := bp.Block.Copy()
@@ -518,6 +557,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
 
 	b.printAssetsOwnership()
 
+	b.printVotings()
+
     // If HopLimit is > 1 decrement and broadcast
     b.broadcastBlockPublishDecrementingHopLimit(bp)
 }
@@ -545,9 +586,13 @@ func (b *Blockchain) integrateValidTxs(block *model.Block) {
 				answers, answersExist := b.VoteAnswers[questionId]
 				if !answersExist {
 					answers = make(map[string]*model.VotationAnswerWrapper)
+					answers[vawCopy.Replier] = &vawCopy
+					b.VoteAnswers[questionId] = answers
+				} else {
+					answers[vawCopy.Replier] = &vawCopy
 				}
-				answers[vawCopy.Replier] = &vawCopy
-				//I could decrypt here if you want.
+
+
 				b.VoteAnswersMutex.Unlock()
 
 			case tx.VotationStatement != nil:
@@ -663,6 +708,54 @@ func (b *Blockchain) printAssetsOwnership() {
 	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
 }
 
+func (b *Blockchain) printVotings() {
+	toPrint := ""
+	question_prints := make(map[string]string)
+	b.VoteStatementMutex.Lock()
+	for question_id, vs := range b.VoteStatement{
+		question_prints[question_id] = question_id + ":  " + vs.Question+ " from " +vs.Origin+" on asset "+ vs.AssetName
+	}
+	b.VoteStatementMutex.Unlock()
+
+	question_keys_copy := make(map[string]string)
+	b.gossiper.QuestionKeyMutex.Lock()
+	for question_id, _ := range question_prints{
+		key, keyExists := b.gossiper.QuestionKey[question_id]
+		if keyExists {
+			question_keys_copy[question_id] = key
+		}
+	}
+	b.gossiper.QuestionKeyMutex.Unlock()
+
+	b.VoteAnswersMutex.Lock()
+	for question_id, question_print := range question_prints {
+		toPrint += question_print
+		for voteReplier, vote := range b.VoteAnswers[question_id]{
+
+			//TODO: I HAVE TO LOCK HERE
+			key, keyExists := question_keys_copy[question_id]
+			var bool_str string
+			if keyExists{
+				key_byte, err := hex.DecodeString(key)
+
+				ans_decrypted, err := vote.Decrypt(key_byte)
+				if err != nil{
+					fmt.Println("failled to decrypt answer")
+					return
+				}
+
+				bool_str = strconv.FormatBool(ans_decrypted.Answer)
+			}
+			toPrint += "\n---" + voteReplier +" "+ bool_str
+		}
+		toPrint += "\n"
+	}
+
+	b.VoteAnswersMutex.Unlock()
+
+	fmt.Println("VOTATIONS:\n" + toPrint)
+}
+
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {
 	gp := model.GossipPacket{TxPublish: tp}
 	go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
@@ -717,8 +810,11 @@ func (b *Blockchain) SendShareTx(asset, to string, amount uint64) {
 }
 
 func (b *Blockchain) SendTxPublish(tx *model.Transaction) {
+    if tx.Signature == nil {
+        b.gossiper.SignTx(tx)
+    }
 
-	tp := model.TxPublish{
+    tp := model.TxPublish{
 		Transaction: *tx,
 		HopLimit:    10,
 	}
@@ -807,15 +903,6 @@ func (b *Blockchain) createBlockAndMine() *model.Block {
 }
 
 func (b *Blockchain) SendIdentityTx(identityName string) {
-    b.identitiesMutex.Lock()
-    _, isThere := b.identities[identityName]
-    b.identitiesMutex.Unlock()
-    if isThere {
-        fmt.Printf("❗️ Cannot add the identity \"%v\" because already claimed \n\n", identityName)
-        return
-    }
-
-
     newIdentity := &model.Identity{
 		Name: identityName,
 	}
@@ -833,19 +920,39 @@ func (b *Blockchain) SendIdentityTx(identityName string) {
 		newIdentity.SetPublicKey(&privateKey.PublicKey)
 	}
 
-	fmt.Printf("👤 New Identity - Name: %v \n", identityName)
-	//fmt.Printf("PrivateKey: Private Exponent=%v\n Prime factors=%v \n", privateKey.D, privateKey.Primes)
-	//fmt.Printf("PublicKey: Modulus=%v\n Public Exponent=%v \n", newIdentity.PublicKey.N, newIdentity.PublicKey.E)
 
-    // the first 25 chars are always the same
-    fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
-
-    // the first 19 chars are always the same
-    fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
-
-
-	tx := model.Transaction{
+	tx := &model.Transaction{
 		Identity: newIdentity,
 	}
-	b.SendTxPublish(&tx)
+
+    b.gossiper.SignTx(tx)
+
+    isValid, err := b.isValidTx(tx)
+    if isValid {
+        alreadyPending := b.isAlreadyPendingIdentity(newIdentity)
+
+        if !alreadyPending {
+            fmt.Printf("👤 New Identity - Name: %v \n", identityName)
+            fmt.Printf("PrivateKey: %v \n", model.PrivateKeyString(privateKey))
+            fmt.Printf("PublicKey:  %v\n\n", model.PublicKeyString(newIdentity.PublicKeyObj()))
+            //fmt.Printf("Hash: %v \n", newIdentity.HashStr())
+            b.SendTxPublish(tx)
+        } else {
+            fmt.Println("❗️ Cannot add the identity \"" + identityName + "\" because already in the pending pool\n")
+        }
+    } else {
+        fmt.Println(err)
+    }
+}
+
+
+func (b *Blockchain) isAlreadyPendingIdentity(newIdentity *model.Identity) bool {
+    for _, tx := range b.txsPool {
+        if tx.Identity != nil {
+            if tx.Identity.Name == newIdentity.Name {
+                return true
+            }
+        }
+    }
+    return false
 }
