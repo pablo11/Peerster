@@ -37,6 +37,11 @@ func (s *Signature) Copy() Signature {
     return newSignature
 }
 
+
+func (s *Signature) PrintSignature() {
+    fmt.Printf("🔏 Signature: Name=%v Hash(Bitstring)=%v\n", s.Name, hex.EncodeToString(s.BitString))
+}
+
 func PrivateKeyString(privateKey *rsa.PrivateKey) string {
     privateKeyByte := x509.MarshalPKCS1PrivateKey(privateKey)
     sha256PrivateKeyByte := sha256.Sum256(privateKeyByte)
