@@ -12,6 +12,10 @@
     font-weight: bold;
 }
 
+#listAssetVotes tr>th:last-child, tr>td:last-child {
+    text-align: right;
+}
+
 .float-right {
     float: right;
 }

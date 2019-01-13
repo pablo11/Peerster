@@ -72,7 +72,7 @@
 
 
     <div id="assetModal" class="modal fade assetModal" role="dialog">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
 
             <div class="modal-content">
                 <div class="modal-header">
@@ -80,7 +80,7 @@
                 </div>
                 <div class="modal-body">
                     <h2 class="modal-title" id="modalAssetName">Acer</h2>
-                    <h4>You have <b>43</b> shares of this asset over a total supply of 1'500.</h4>
+                    <h4>You have <b id="modalAssetBalance"></b> shares of this asset over a total supply of <span id="modalAssetTotSupply"></span>.</h4>
 
                     <hr />
 
@@ -130,21 +130,13 @@
                                     <thead>
                                         <tr>
                                             <th>Question</th>
-                                            <th>Positive/negative votes</th>
-                                            <th></th>
+                                            <th>Yes/No votes</th>
+                                            <th>Proposed by</th>
+                                            <th>Vote</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>Fire CEO?</td>
-                                            <td>3/1</td>
-                                            <td><button class="btn btn-success btn-xs">vote</button></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Invest in crypto</td>
-                                            <td>4/0</td>
-                                            <td><button class="btn btn-success btn-xs">vote</button></td>
-                                        </tr>
+                                    <tbody id="assetModalListVotes">
+                                        
                                     </tbody>
                                 </table>
                             </div>

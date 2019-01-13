@@ -36,7 +36,7 @@ type Blockchain struct {
 	// Mapping of identities in the blockchain [k: Name => v: Identity]
 	identities      map[string]*model.Identity
 	identitiesMutex sync.Mutex
-	
+
 	// Mapping of question_id a VotationStatement in the blockchain [k: question_id => v: *VotationStatement]
     VoteStatement map[string]*model.VotationStatement
     VoteStatementMutex sync.Mutex
@@ -106,16 +106,42 @@ func (b *Blockchain) GetMyAssetsJson() string {
 }
 
 func (b *Blockchain) GetAssetVotesJson(assetName string) string {
+	votesStr := make([]string, 0)
+
 	b.VoteStatementMutex.Lock()
-	_, votesExist := b.VoteStatement[assetName]
+	voteStatements := b.VoteStatement
 	b.VoteStatementMutex.Unlock()
-	if !votesExist {
-		return `[]`
+	for questionId, q := range voteStatements {
+		if q.AssetName == assetName {
+			b.VoteAnswersMutex.Lock()
+			answers, areAvailable := b.VoteAnswers[questionId]
+			b.VoteAnswersMutex.Unlock()
+			answersStr := make([]string, 0)
+			if areAvailable {
+				for assetHolder, voteAnswerWrapper := range answers {
+					questionKey, isPresent := b.gossiper.QuestionKey[questionId]
+					if isPresent {
+						byteKey, err := hex.DecodeString(questionKey)
+						if err == nil {
+							decryptedAnswer, err := voteAnswerWrapper.Decrypt(byteKey)
+							if err == nil {
+								holderAnswer := "\"" + assetHolder + "\":"
+								if decryptedAnswer.Answer {
+									holderAnswer += "\"yes\""
+								} else {
+									holderAnswer += "\"no\""
+								}
+								answersStr = append(answersStr, holderAnswer)
+							}
+						}
+					}
+				}
+			}
+
+			votesStr = append(votesStr, "\"" + questionId + "\":{\"question\":\"" + q.Question + "\", \"origin\":\"" + q.Origin + "\", \"answers\":{" + strings.Join(answersStr, ",") + "}}")
+		}
 	}
-
-	return ""
-
-
+	return `{` + strings.Join(votesStr, ",") + `}`
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
