@@ -2,7 +2,6 @@ package gossip
 
 import (
     "encoding/hex"
-    "time"
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
@@ -34,36 +33,12 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
         fmt.Println("Discarding Tx: " + errorMsg)
         return
     }
-<<<<<<< HEAD
-	g.Blockchain.SendTxPublish(&tx)
-=======
+
 
     txCopy := tx.Copy()
 
-    fmt.Println("Creating Votation tx hash: " + txCopy.HashStr())
-
 	g.Blockchain.SendTxPublish(&txCopy)
 
-	key := make([]byte, 32)
-	rand.Read(key)
-
-	key_str := hex.EncodeToString(key)
-	g.QuestionKeyMutex.Lock()
-	g.QuestionKey[vs.GetId()] = key_str
-	g.QuestionKeyMutex.Unlock()
-
-	var peers []string
-	//Send to all shareholders
-	g.Blockchain.AssetsMutex.Lock()
-	for p,_ := range g.Blockchain.Assets[assetName]{
-		peers = append(peers, p) //Assume that peer with asset 0 have been removed
-	}
-	g.Blockchain.AssetsMutex.Unlock()
-
-	//debug.Debug("Sending symmetric to all peers")
-	go g.sendKeyToAllPeers(peers,key_str,vs.GetId())
-
->>>>>>> asset-digitization
 }
 
 func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
@@ -136,7 +111,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	//move from pending to completed? => This is done in GUI
 }
 
-<<<<<<< HEAD
+
 func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
 
 	key := make([]byte, 32)
@@ -157,7 +132,7 @@ func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
 
 	for _,p := range peers{
 		if p != g.Name {
-			pm := g.NewEncryptedPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+			pm := g.NewEncryptedPrivateMessage(g.Name, createPMWithKey(key_str,questionId), p)
             g.SignPrivateMessage(pm)
 			g.SendPrivateMessage(pm)
 		}
