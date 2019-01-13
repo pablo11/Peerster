@@ -130,6 +130,14 @@ func (b *Blockchain) GetAssetVotesJson(assetName string) string {
 			b.VoteAnswersMutex.Unlock()
 			answersStr := make([]string, 0)
 			if areAvailable {
+
+				b.AssetsMutex.Lock()
+				assetBalances, assetBalancesExist := b.Assets[assetName]
+				b.AssetsMutex.Unlock()
+				if !assetBalancesExist {
+					return "{}"
+				}
+
 				for assetHolder, voteAnswerWrapper := range answers {
 					questionKey, isPresent := b.gossiper.QuestionKey[questionId]
 					if isPresent {
@@ -137,12 +145,19 @@ func (b *Blockchain) GetAssetVotesJson(assetName string) string {
 						if err == nil {
 							decryptedAnswer, err := voteAnswerWrapper.Decrypt(byteKey)
 							if err == nil {
-								holderAnswer := "\"" + assetHolder + "\":"
+								holderAnswer := "\"" + assetHolder + "\":{\"reply\":"
 								if decryptedAnswer.Answer {
 									holderAnswer += "\"yes\""
 								} else {
 									holderAnswer += "\"no\""
 								}
+
+								holderBalance, nonzero := assetBalances[assetHolder]
+								if !nonzero {
+									holderBalance = 0
+								}
+
+								holderAnswer += ",\"balance\":" + strconv.Itoa(int(holderBalance)) + "}"
 								answersStr = append(answersStr, holderAnswer)
 							}
 						}
