@@ -107,7 +107,7 @@ func (b *Blockchain) GetMyAssetsJson() string {
 
 func (b *Blockchain) GetAssetVotesJson(assetName string) string {
 	b.VoteStatementMutex.Lock()
-	votes, votesExist := b.VoteStatement[assetName]
+	_, votesExist := b.VoteStatement[assetName]
 	b.VoteStatementMutex.Unlock()
 	if !votesExist {
 		return `[]`

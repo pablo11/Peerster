@@ -321,7 +321,7 @@ func (a *ApiHandler) Votations(w http.ResponseWriter, r *http.Request) {
 
 	var jsonFiles []string
 
-	for question_id, vs := range voteStatements {
+	for _, vs := range voteStatements {
 		haveTheAsset := false
 		//Only send question for assets you have
 		for shareholders,shares := range assetsMap[vs.AssetName] {
