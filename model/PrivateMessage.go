@@ -10,6 +10,7 @@ type PrivateMessage struct {
     Text string
     Destination string
     HopLimit uint32
+    IsEncrypted bool
 }
 
 func NewPrivateMessage(origin, text, dest string) *PrivateMessage {
@@ -19,6 +20,7 @@ func NewPrivateMessage(origin, text, dest string) *PrivateMessage {
         Text: text,
         Destination: dest,
         HopLimit: 10,
+        IsEncrypted: false,
     }
 }
 
@@ -26,4 +28,3 @@ func (pm *PrivateMessage) String() string {
     hopLimitStr := strconv.FormatUint(uint64(pm.HopLimit), 10)
     return "PRIVATE origin " + pm.Origin + " hop-limit " + hopLimitStr + " contents " + pm.Text
 }
-

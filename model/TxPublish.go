@@ -17,3 +17,14 @@ func (t *TxPublish) HashStr() string {
     hash := t.Hash()
     return hex.EncodeToString(hash[:])
 }
+
+
+
+func (t *TxPublish) Copy() TxPublish {
+    tp := TxPublish{
+        Transaction: t.Transaction.Copy(),
+        HopLimit: t.HopLimit,
+    }
+
+    return tp
+}

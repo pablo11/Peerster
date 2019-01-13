@@ -52,7 +52,15 @@ func (g *Gossiper) NewEncryptedPrivateMessage(origin, text, dest string) *model.
 
     cypherBytes := g.Encrypt([]byte(text), toIdentity.PublicKeyObj())
     cypherText := string(cypherBytes[:])
-    return model.NewPrivateMessage(origin, cypherText, dest)
+
+    return &model.PrivateMessage{
+        Origin: origin,
+        ID: 0,
+        Text: cypherText,
+        Destination: dest,
+        HopLimit: 10,
+        IsEncrypted: true,
+    }
 }
 
 
@@ -62,15 +70,20 @@ func (g *Gossiper) Decrypt(encryptedData []byte) []byte {
 
     rng := rand.Reader
 
-    plainData, err := rsa.DecryptOAEP(sha256.New(), rng, g.PrivateKey, encryptedData, label)
+    plainBytes, err := rsa.DecryptOAEP(sha256.New(), rng, g.PrivateKey, encryptedData, label)
     if err != nil {
         fmt.Fprintf(os.Stderr, "❌🔓 Error from decryption: %s\n", err)
         return nil
     }
 
-    fmt.Printf("🔓 Plain Data: %s\n", string(plainData))
+    fmt.Printf("🔓 Plain Bytes: %s\n", string(plainBytes))
 
-    return plainData
+    return plainBytes
 }
 
-// QUESTION: should we encrypt messages as well?
+func (g *Gossiper) DecryptPrivateMessage(pm *model.PrivateMessage) {
+    cyptherBytes := []byte(pm.Text)
+
+    plainBytes := g.Decrypt(cyptherBytes)
+    pm.Text = string(plainBytes)
+}

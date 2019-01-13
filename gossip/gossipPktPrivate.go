@@ -3,16 +3,28 @@ package gossip
 import (
     "fmt"
     "github.com/pablo11/Peerster/model"
-	//"github.com/pablo11/Peerster/util/debug"
+	"github.com/pablo11/Peerster/util/debug"
 	"regexp"
 )
 
 func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) {
     if gp.Private.Destination == g.Name {
+        // If the package is encrypted, decrypt it
+        if gp.Private.IsEncrypted {
+            debug.Debug("Receiving an message encrypted")
+
+            g.DecryptPrivateMessage(gp.Private)
+        } else {
+            debug.Debug("Receiving an message in plain text")
+        }
+
+
         // If the private message is for this node, display it
         g.printGossipPacket("", fromAddrStr, gp)
 		//debug.Debug("Received private message ")
-		if checkPMWithKey(gp.Private.Text) {
+
+
+        if checkPMWithKey(gp.Private.Text) {
 
 			key, question_id := getKeyFromPM(gp.Private.Text)
 			g.QuestionKeyMutex.Lock()
@@ -20,7 +32,7 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
 			g.QuestionKeyMutex.Unlock()
 			//debug.Debug("Received a symmetric key for question "+question_id)
 		}
-		
+
     } else {
         // Forward the message and decrease the HopLimit
         pm := gp.Private

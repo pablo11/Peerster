@@ -6,6 +6,7 @@ import (
     "crypto/rand"
     "crypto/sha256"
     "crypto"
+    //"encoding/hex"
     "github.com/pablo11/Peerster/model"
     //"github.com/pablo11/Peerster/util/debug"
 )
@@ -33,7 +34,7 @@ func (g *Gossiper) Sign(data [32]byte) *model.Signature {
     s.BitString = make([]byte, len(bitString))
     copy(s.BitString, bitString)
 
-    s.PrintSignature()
+    //s.PrintSignature()
     return s
 }
 
@@ -100,6 +101,12 @@ func (b *Blockchain) VerifyTx(tx *model.Transaction) bool {
         case tx.VotationAnswerWrapper != nil:
             verified = b.Verify(sig, tx.VotationAnswerWrapper.Hash())
         case tx.VotationStatement != nil:
+            /*debug.Debug("Votation tx hash: " + tx.HashStr())
+            bytevote := tx.VotationStatement.Hash()
+            debug.Debug("Votation question hash: " + hex.EncodeToString(bytevote[:]))
+            debug.Debug("Votation signature check: ")
+            tx.Signature.PrintSignature()*/
+
             verified = b.Verify(sig, tx.VotationStatement.Hash())
     }
 

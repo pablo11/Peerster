@@ -14,8 +14,16 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
             if cm.Dest == "" {
                 go g.SendPublicMessage(cm.Text, true)
             } else {
-                pm := model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
-                go g.SendPrivateMessage(pm)
+                var pm *model.PrivateMessage
+                if cm.Encrypt {
+                    pm = g.NewEncryptedPrivateMessage(g.Name, cm.Text, cm.Dest)
+                } else {
+                    pm = model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
+                }
+
+                if pm != nil {
+                    go g.SendPrivateMessage(pm)
+                }
             }
 
         case "indexFile":
@@ -36,13 +44,13 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
 
         case "shareTx":
             go g.Blockchain.SendShareTx(cm.Asset, cm.Dest, cm.Amount)
-		
+
 		case "vote":
 			go g.LaunchVotation(cm.Text,cm.Asset)
-		
+
 		case "voteAnswer":
 			go g.AnswerVotation(cm.Text, cm.Asset, cm.Origin, cm.Answer)
-		
+
         default:
             fmt.Println("WARNING: Unoknown client message type")
     }

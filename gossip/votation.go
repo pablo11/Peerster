@@ -2,6 +2,7 @@ package gossip
 
 import (
     "encoding/hex"
+    "time"
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
@@ -33,7 +34,21 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
         fmt.Println("Discarding Tx: " + errorMsg)
         return
     }
-	g.Blockchain.SendTxPublish(&tx)
+
+
+    txCopy := tx.Copy()
+
+    fmt.Println("Creating Votation tx hash: " + txCopy.HashStr())
+
+	g.Blockchain.SendTxPublish(&txCopy)
+
+
+    /*debug.Debug("Votation tx hash: " + txCopy.HashStr())
+    bytevote := txCopy.VotationStatement.Hash()
+    debug.Debug("Votation question hash: " + hex.EncodeToString(bytevote[:]))
+    debug.Debug("Votation signature check: ")
+    txCopy.Signature.PrintSignature()*/
+
 
 	key := make([]byte, 32)
 	rand.Read(key)
@@ -52,7 +67,7 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 	g.Blockchain.AssetsMutex.Unlock()
 
 	//debug.Debug("Sending symmetric to all peers")
-	g.sendKeyToAllPeers(peers,key_str,vs.GetId())
+	go g.sendKeyToAllPeers(peers,key_str,vs.GetId())
 
 }
 
@@ -126,10 +141,11 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 }
 
 func (g *Gossiper) sendKeyToAllPeers(peers []string , key string, questionId string){
+    time.Sleep(2 * time.Second)
 
 	for _,p := range peers{
 		if p != g.Name {
-			pm := model.NewPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+			pm := g.NewEncryptedPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
 
 			//ENCRYPT PRIVATE !!
 			g.SendPrivateMessage(pm)

@@ -27,6 +27,11 @@ func (t *Transaction) Hash() (out [32]byte) {
         case t.ShareTx != nil:
             txContentHash = t.ShareTx.Hash()
 
+        case t.VotationStatement != nil:
+            txContentHash = t.VotationStatement.Hash()
+
+        case t.VotationAnswerWrapper != nil:
+            txContentHash = t.VotationAnswerWrapper.Hash()
     }
 
     h := sha256.New()
@@ -48,10 +53,10 @@ func (t *Transaction) Copy() Transaction {
     txCopy := Transaction{
         File: nil,
         Identity: nil,
+        ShareTx: nil,
 		VotationStatement: nil,
 		VotationAnswerWrapper: nil,
         Signature: nil,
-        ShareTx: nil,
     }
 
     switch {
@@ -66,14 +71,14 @@ func (t *Transaction) Copy() Transaction {
         case t.ShareTx != nil:
             shareTxCopy := t.ShareTx.Copy()
             txCopy.ShareTx = &shareTxCopy
-			
+
 		case t.VotationStatement != nil:
 			votationStatementCopy := t.VotationStatement.Copy()
 			txCopy.VotationStatement = &votationStatementCopy
-			
+
 		case t.VotationAnswerWrapper != nil:
-			VotationAnswerWrapperCopy := t.VotationAnswerWrapper.Copy()
-			txCopy.VotationAnswerWrapper = &VotationAnswerWrapperCopy
+			votationAnswerWrapperCopy := t.VotationAnswerWrapper.Copy()
+			txCopy.VotationAnswerWrapper = &votationAnswerWrapperCopy
     }
 
     if t.Signature != nil {
@@ -94,6 +99,12 @@ func (t *Transaction) String() string {
 
         case t.ShareTx != nil:
             return t.ShareTx.String()
+
+        case t.VotationStatement != nil:
+            return t.VotationStatement.String()
+
+        case t.VotationAnswerWrapper != nil:
+            return t.VotationAnswerWrapper.String()
     }
     return ""
 }
