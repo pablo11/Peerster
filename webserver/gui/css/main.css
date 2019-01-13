@@ -33,3 +33,12 @@
     color: #000;
     font-size: 22px;
 }
+
+#registerIdentityModal h2, button {
+    text-align: center;
+}
+
+svg path,
+svg rect{
+  fill: #fff;
+}

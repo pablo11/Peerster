@@ -5,6 +5,22 @@ import (
     "strconv"
 )
 
+func (a *ApiHandler) CheckIdentity(w http.ResponseWriter, r *http.Request) {
+    identityRegisteredStr := "{\"identityRegistered\":false}"
+    if a.gossiper.Blockchain.IsMyIdOnBlockchain() {
+        identityRegisteredStr = "{\"identityRegistered\":true}"
+    }
+
+    sendJSON(w, []byte(identityRegisteredStr))
+}
+
+func (a *ApiHandler) RegisterIdentity(w http.ResponseWriter, r *http.Request) {
+    go a.gossiper.Blockchain.SendIdentityTx(a.gossiper.Name)
+
+    w.Header().Set("Server", "Cryptop GO server")
+    w.WriteHeader(200)
+}
+
 func (a *ApiHandler) ListAssets(w http.ResponseWriter, r *http.Request) {
     myAssetsJson := a.gossiper.Blockchain.GetMyAssetsJson()
     sendJSON(w, []byte(myAssetsJson))

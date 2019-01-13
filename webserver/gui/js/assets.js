@@ -1,34 +1,73 @@
+var assets = {}
+var nodeName = ""
+var currentAsset = ""
+var currentVotes = {}
+var identityRegistered = false
+
 $(document).ready(function() {
     loadNodeId()
-    setupCreateNewAsset()
-    setupSendShares()
-    setupAskQuestion()
+    setupIdentityRegistrationRequirement()
 
-    fetchAndDisplayMyAssets()
-    setInterval(function() {
+    if (identityRegistered) {
+        setupCreateNewAsset()
+        setupSendShares()
+        setupAskQuestion()
+
         fetchAndDisplayMyAssets()
-    }, 2000)
+        setInterval(function() {
+            fetchAndDisplayMyAssets()
+        }, 2000)
 
-    //  Update the asset's votations every 3 seconds
+        //  Update the asset's votations every 3 seconds
 
-    setInterval(function() {
-        showAsset(currentAsset)
-    }, 2000)
+        setInterval(function() {
+            showAsset(currentAsset)
+        }, 2000)
+    }
 
     $("#assetModal").on('hide.bs.modal', function() {
         currentAsset = ""
     });
 })
 
-var assets = {}
-var nodeName = ""
-var currentAsset = ""
-var currentVotes = {}
-
 function loadNodeId() {
     $.get("api/id", function(data, status) {
         nodeName = data.name
     })
+}
+
+function setupIdentityRegistrationRequirement() {
+    if (!identityRegistered) {
+        $(".claimIdentityBtnLoader").hide()
+        $("#registerIdentityModal").modal("show")
+
+        $("#claimIdentityBtn").click(function() {
+            $("#claimIdentityBtn").prop("disabled", true)
+            $(".claimIdentityBtnTitle").hide()
+            $(".claimIdentityBtnLoader").show()
+
+            $.get("api/identity/register", function(data, status) {
+                waitForIdentityRegistration()
+            })
+        })
+    }
+}
+
+function checkIfIdentityIsRegistered() {
+    $.get("api/identity/check", function(data, status) {
+        identityRegistered = data.identityRegistered
+        if (identityRegistered) {
+            $("#registerIdentityModal").modal("hide")
+        } else {
+            waitForIdentityRegistration()
+        }
+    })
+}
+
+function waitForIdentityRegistration() {
+    setTimeout(function() {
+        checkIfIdentityIsRegistered()
+    }, 2000)
 }
 
 function setupCreateNewAsset() {

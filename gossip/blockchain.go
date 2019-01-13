@@ -105,6 +105,18 @@ func (b *Blockchain) GetMyAssetsJson() string {
 	return `{` + strings.Join(myAssetsStr, ",") + `}`
 }
 
+func (b * Blockchain) IsMyIdOnBlockchain() bool {
+	b.identitiesMutex.Lock()
+	identity, isPresent := b.identities[b.gossiper.Name]
+	b.identitiesMutex.Unlock()
+
+	if !isPresent {
+		return false
+	}
+
+	return identity.Name == b.gossiper.Name && model.PublicKeyString(identity.PublicKeyObj()) == model.PublicKeyString(&b.gossiper.PrivateKey.PublicKey)
+}
+
 func (b *Blockchain) GetAssetVotesJson(assetName string) string {
 	votesStr := make([]string, 0)
 

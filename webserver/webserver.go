@@ -58,6 +58,13 @@ func CreateAndRun(g *gossip.Gossiper, webserverPort string) {
 
 
 
+    // Check if my identity is on the blockchain
+    r.HandleFunc("/api/identity/check", a.CheckIdentity).Methods("GET")
+
+    // Check if my identity is on the blockchain
+    r.HandleFunc("/api/identity/register", a.RegisterIdentity).Methods("GET")
+
+
 
     // List assets
     r.HandleFunc("/api/assets/list", a.ListAssets).Methods("GET")
