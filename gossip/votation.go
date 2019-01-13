@@ -2,6 +2,7 @@ package gossip
 
 import (
     "encoding/hex"
+    "time"
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
@@ -11,7 +12,6 @@ import (
 func (g *Gossiper) LaunchVotation(question string, assetName string){
 	//Create and put TxVotationStatement in pending Blocks
 	//Send symmetric key to all peers
-		//What would be the message kind?
 
 	//debug.Debug("Launching votating")
 	vs := model.VotationStatement{
@@ -20,7 +20,8 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 		AssetName: assetName,
 	}
 
-	sign := g.Sign(vs.Hash())
+    data := vs.Hash()
+	sign := g.Sign(data[:])
 
 	tx := model.Transaction{
 		VotationStatement:	&vs,
@@ -33,7 +34,36 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
         fmt.Println("Discarding Tx: " + errorMsg)
         return
     }
+<<<<<<< HEAD
 	g.Blockchain.SendTxPublish(&tx)
+=======
+
+    txCopy := tx.Copy()
+
+    fmt.Println("Creating Votation tx hash: " + txCopy.HashStr())
+
+	g.Blockchain.SendTxPublish(&txCopy)
+
+	key := make([]byte, 32)
+	rand.Read(key)
+
+	key_str := hex.EncodeToString(key)
+	g.QuestionKeyMutex.Lock()
+	g.QuestionKey[vs.GetId()] = key_str
+	g.QuestionKeyMutex.Unlock()
+
+	var peers []string
+	//Send to all shareholders
+	g.Blockchain.AssetsMutex.Lock()
+	for p,_ := range g.Blockchain.Assets[assetName]{
+		peers = append(peers, p) //Assume that peer with asset 0 have been removed
+	}
+	g.Blockchain.AssetsMutex.Unlock()
+
+	//debug.Debug("Sending symmetric to all peers")
+	go g.sendKeyToAllPeers(peers,key_str,vs.GetId())
+
+>>>>>>> asset-digitization
 }
 
 func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
@@ -47,7 +77,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	g.Blockchain.VoteStatementMutex.Unlock()
 
 	if !questionExist{
-		fmt.Println("the question you'r trying to answer does not exist")
+		fmt.Println("❌ The question you'are trying to answer does not exist")
 		return
 	}
 
@@ -86,7 +116,8 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 		Replier: g.Name,
 	}
 
-	sign := g.Sign(vaw.Hash())
+    data := vaw.Hash()
+	sign := g.Sign(data[:])
 
 	tx := model.Transaction{
 		VotationAnswerWrapper:	&vaw,
@@ -105,6 +136,7 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 	//move from pending to completed? => This is done in GUI
 }
 
+<<<<<<< HEAD
 func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
 
 	key := make([]byte, 32)
@@ -125,9 +157,8 @@ func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
 
 	for _,p := range peers{
 		if p != g.Name {
-			pm := model.NewPrivateMessage(g.Name, createPMWithKey(key_str,questionId), p)
-
-			//ENCRYPT PRIVATE !!
+			pm := g.NewEncryptedPrivateMessage(g.Name, createPMWithKey(key,questionId), p)
+            g.SignPrivateMessage(pm)
 			g.SendPrivateMessage(pm)
 		}
 	}

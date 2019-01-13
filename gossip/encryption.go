@@ -35,7 +35,8 @@ func (g *Gossiper) Encrypt(data []byte, publicKey *rsa.PublicKey) []byte {
         return nil
     }
 
-    fmt.Printf("🔒EncryptedData: %x\n", encryptedData)
+    //fmt.Printf("🔒 Data Encrypted: %x\n", encryptedData)
+    fmt.Printf("🔒 Data Encrypted\n")
 
     return encryptedData
 }
@@ -52,8 +53,17 @@ func (g *Gossiper) NewEncryptedPrivateMessage(origin, text, dest string) *model.
 
     cypherBytes := g.Encrypt([]byte(text), toIdentity.PublicKeyObj())
     cypherText := string(cypherBytes[:])
-    return model.NewPrivateMessage(origin, cypherText, dest)
+
+    return &model.PrivateMessage{
+        Origin: origin,
+        ID: 0,
+        Text: cypherText,
+        Destination: dest,
+        HopLimit: 10,
+        IsEncrypted: true,
+    }
 }
+
 
 
 // ===== Decrypt =====
@@ -62,15 +72,21 @@ func (g *Gossiper) Decrypt(encryptedData []byte) []byte {
 
     rng := rand.Reader
 
-    plainData, err := rsa.DecryptOAEP(sha256.New(), rng, g.PrivateKey, encryptedData, label)
+    plainBytes, err := rsa.DecryptOAEP(sha256.New(), rng, g.PrivateKey, encryptedData, label)
     if err != nil {
         fmt.Fprintf(os.Stderr, "❌🔓 Error from decryption: %s\n", err)
         return nil
     }
 
-    fmt.Printf("🔓 Plain Data: %s\n", string(plainData))
+    //fmt.Printf("🔓 Date Decrypted: %s\n", string(plainBytes))
+    fmt.Printf("🔓 Data Decrypted\n")
 
-    return plainData
+    return plainBytes
 }
 
-// QUESTION: should we encrypt messages as well?
+func (g *Gossiper) DecryptPrivateMessage(pm *model.PrivateMessage) {
+    cypherBytes := []byte(pm.Text)
+
+    plainBytes := g.Decrypt(cypherBytes)
+    pm.Text = string(plainBytes)
+}

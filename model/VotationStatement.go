@@ -21,13 +21,11 @@ func (vs *VotationStatement) Hash()  (out [32]byte) {
 }
 
 func (vs *VotationStatement) Copy() VotationStatement {
-	new_vs := VotationStatement{
+	return VotationStatement{
 		Question: vs.Question,
 		Origin:	vs.Origin,
 		AssetName: vs.AssetName,
 	}
-
-	return new_vs
 }
 
 func (vs *VotationStatement) String() string {
