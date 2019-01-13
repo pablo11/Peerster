@@ -15,13 +15,18 @@ func (g *Gossiper) HandlePktClient(cm *model.ClientMessage) {
                 go g.SendPublicMessage(cm.Text, true)
             } else {
                 var pm *model.PrivateMessage
+                text := cm.Text
+
                 if cm.Encrypt {
-                    pm = g.NewEncryptedPrivateMessage(g.Name, cm.Text, cm.Dest)
+                    pm = g.NewEncryptedPrivateMessage(g.Name, text, cm.Dest)
                 } else {
-                    pm = model.NewPrivateMessage(g.Name, cm.Text, cm.Dest)
+                    pm = model.NewPrivateMessage(g.Name, text, cm.Dest)
                 }
 
                 if pm != nil {
+                    if cm.Sign {
+                        g.SignPrivateMessage(pm)
+                    }
                     go g.SendPrivateMessage(pm)
                 }
             }

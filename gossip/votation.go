@@ -21,7 +21,8 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 		AssetName: assetName,
 	}
 
-	sign := g.Sign(vs.Hash())
+    data := vs.Hash()
+	sign := g.Sign(data[:])
 
 	tx := model.Transaction{
 		VotationStatement:	&vs,
@@ -121,7 +122,8 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 		Replier: g.Name,
 	}
 
-	sign := g.Sign(vaw.Hash())
+    data := vaw.Hash()
+	sign := g.Sign(data[:])
 
 	tx := model.Transaction{
 		VotationAnswerWrapper:	&vaw,

@@ -13,7 +13,7 @@ import (
 
 
 // ===== Signing =====
-func (g *Gossiper) Sign(data [32]byte) *model.Signature {
+func (g *Gossiper) Sign(data []byte) *model.Signature {
     var opts rsa.PSSOptions
     opts.SaltLength = rsa.PSSSaltLengthAuto
 
@@ -23,7 +23,7 @@ func (g *Gossiper) Sign(data [32]byte) *model.Signature {
 
     rng := rand.Reader
 
-    hashed := sha256.Sum256(data[:])
+    hashed := sha256.Sum256(data)
 
     bitString, err := rsa.SignPSS(rng, g.PrivateKey, crypto.SHA256, hashed[:], &opts)
     if err != nil {
@@ -43,15 +43,20 @@ func (g *Gossiper) SignTx(tx *model.Transaction) {
 
     switch {
         case tx.File != nil:
-            sig = g.Sign(tx.File.Hash())
+            data := tx.File.Hash()
+            sig = g.Sign(data[:])
         case tx.Identity != nil:
-            sig = g.Sign(tx.Identity.Hash())
+            data := tx.Identity.Hash()
+            sig = g.Sign(data[:])
         case tx.ShareTx != nil:
-            sig = g.Sign(tx.ShareTx.Hash())
+            data := tx.ShareTx.Hash()
+            sig = g.Sign(data[:])
         case tx.VotationAnswerWrapper != nil:
-            sig = g.Sign(tx.VotationAnswerWrapper.Hash())
+            data := tx.VotationAnswerWrapper.Hash()
+            sig = g.Sign(data[:])
         case tx.VotationStatement != nil:
-            sig = g.Sign(tx.VotationStatement.Hash())
+            data := tx.VotationStatement.Hash()
+            sig = g.Sign(data[:])
     }
 
     tx.Signature = sig
@@ -59,12 +64,21 @@ func (g *Gossiper) SignTx(tx *model.Transaction) {
 }
 
 
+func (g *Gossiper) SignPrivateMessage(pm *model.PrivateMessage) {
+    cyptherBytes := pm.IntegrityHash()
+    sig := g.Sign(cyptherBytes[:])
+
+    sigCopy := sig.Copy()
+    pm.Signature = &sigCopy
+    return
+}
+
 // ===== Verification =====
-func (b *Blockchain) Verify(sig *model.Signature, data [32]byte) bool {
+func (b *Blockchain) Verify(sig *model.Signature, data []byte) bool {
     var opts rsa.PSSOptions
     opts.SaltLength = rsa.PSSSaltLengthAuto
 
-    hashed := sha256.Sum256(data[:])
+    hashed := sha256.Sum256(data)
 
     // TODO: get publicKey from Name
     b.identitiesMutex.Lock()
@@ -92,23 +106,26 @@ func (b *Blockchain) VerifyTx(tx *model.Transaction) bool {
     verified := false
     switch {
         case tx.File != nil:
-            verified = b.Verify(sig, tx.File.Hash())
+            data := tx.File.Hash()
+            verified = b.Verify(sig, data[:])
         case tx.Identity != nil:
             verified = true
             //verified = b.Verify(sig, tx.Identity.Hash())
         case tx.ShareTx != nil:
-            verified = b.Verify(sig, tx.ShareTx.Hash())
+            data := tx.ShareTx.Hash()
+            verified = b.Verify(sig, data[:])
         case tx.VotationAnswerWrapper != nil:
-            verified = b.Verify(sig, tx.VotationAnswerWrapper.Hash())
+            data := tx.VotationAnswerWrapper.Hash()
+            verified = b.Verify(sig, data[:])
         case tx.VotationStatement != nil:
-            /*debug.Debug("Votation tx hash: " + tx.HashStr())
-            bytevote := tx.VotationStatement.Hash()
-            debug.Debug("Votation question hash: " + hex.EncodeToString(bytevote[:]))
-            debug.Debug("Votation signature check: ")
-            tx.Signature.PrintSignature()*/
-
-            verified = b.Verify(sig, tx.VotationStatement.Hash())
+            data := tx.VotationStatement.Hash()
+            verified = b.Verify(sig, data[:])
     }
 
     return verified
+}
+
+func (b *Blockchain) VerifyPrivateMessage(pm *model.PrivateMessage) bool {
+    cyptherBytes := pm.IntegrityHash()
+    return b.Verify(pm.Signature, cyptherBytes[:])
 }
