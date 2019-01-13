@@ -23,7 +23,7 @@ $(document).ready(function() {
     //  Update the asset's votations every 2 seconds
     setInterval(function() {
         showAsset(currentAsset)
-    }, 2000)
+    }, 3000)
 
     $("#assetModal").on('hide.bs.modal', function() {
         currentAsset = ""
@@ -96,7 +96,7 @@ function fetchAndDisplayMyAssets() {
         for (assetName in assets) {
             var a = assets[assetName]
             //data-toggle="modal" data-target="#assetModal"
-            html += '<tr onclick="showAsset(\'' + assetName + '\')"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>'
+            htmlRows.push('<tr onclick="showAsset(\'' + assetName + '\')"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>')
         }
 
         htmlRows = htmlRows.sort((a, b) => {
@@ -176,6 +176,10 @@ function showAsset(assetName) {
                 decision = "<b style=\"color:red;\">No</b> with " + (100 - positiveAnswersPercentage) + "%"
             }
 
+            if (nbAnswers == 0) {
+                decision = "-"
+            }
+
             htmlVote = (thisNodeReply != "") ? thisNodeReply : `<div class="btn-group">
                 <button type="button" class="btn btn-xs btn-success" onclick="voteOnAsset(this, '` + v.question + `',true, '` + v.origin + `')">yes</button>
                 <button type="button" class="btn btn-xs btn-danger" onclick="voteOnAsset(this, '` + v.question + `',false, '` + v.origin + `')">no</button>
@@ -235,6 +239,7 @@ function voteOnAsset(button, question, answer, origin) {
         origin: origin,
         answer: answerBoolStr
     }, function(data, status) {
+        console.log("voting", question, currentVotes);
         // Find the right question and answer in the currentVotes and add the vote
         for (vote in currentVotes) {
             if (currentVotes[vote].question == question) {
