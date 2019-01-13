@@ -54,6 +54,7 @@ Navigate to the project directory in a terminal and type `go build`. Then type `
 The client allows multiple interactions:
 - Sending a broadcast message: `./client -UIPort=XXXX -msg=YYYYYY`
 - Sending a private message to a peer: `./client -UIPort=XXXX -msg=YYYYYY -dest=peerName`
+- Sending an encrypted private message to a peer: `./client -UIPort=XXXX -msg=YYYYYY -dest=peerName -encrypt`
 - Indexing a file (the file must be in the \_SharedFiles folder): `./client -UIPort=XXXX -file=filename`
 - Requesting a file to another peer: `./client -UIPort=XXXX -file=filename -dest=peerName -reqest=hashOfTheRequestedChunkOrMetafile`
 - Search files in the network by providing some keywords and optionally a budget: `./client -UIPort=XXXX -keywords=key1,key2 [-budget=4]`
@@ -81,15 +82,22 @@ Chain of 3 peers A<->B<->C
 `./Peerster -rtimer=2 -name=nodeC -UIPort=10003 -gossipAddr=127.0.0.1:5003 -peers=127.0.0.1:5002`
 
 #### The client
-`./client -UIPort=10001 -msg=hello`
-`./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
-`./client -UIPort=10001 -file=2chunks.test`
-`./client -UIPort=10001 -identity=nodeA`
-`./client -UIPort=10001 -asset=Ufity -amount=100 -dest=nodeA`
-`./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity`
-`./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity -origin=nodeA -answer=true`
+##### Message
+Simple: `./client -UIPort=10001 -msg=hello`
+Private message: `./client -UIPort=10001 -msg=hello -dest=nodeB`
+Encrypted Private message: `./client -UIPort=10001 -msg=hello -dest=nodeB -encrypt`
 
+##### File Sharing
+Index a file: `./client -UIPort=10001 -file=2chunks.test`
+Download a file: `./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
+
+##### Blockchain
+Identity: `./client -UIPort=10001 -identity=nodeA`
+Asset creation: `./client -UIPort=10001 -asset=Ufity -amount=100 -dest=nodeA` (from nodeA)
+Asset transaction: `./client -UIPort=10001 -asset=Ufity -amount=50 -dest=nodeB` (from nodeA)
+Vote question: `./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity`
+Vote answer: `./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity -origin=nodeA -answer=true`
 
 
 # TODO
-Check new branch signing
+Check new branch encryption

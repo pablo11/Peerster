@@ -172,13 +172,26 @@ func (b *Blockchain) GetAssetVotesJson(assetName string) string {
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
+    //debug.Debug("HandlePktTxPublish 1")
+
+    //fmt.Println("HandlePktTxPublish: Transaction before copy " + gp.TxPublish.Transaction.HashStr())
+
+    //fmt.Println("HandlePktTxPublish: TxPublish before copy " + gp.TxPublish.HashStr())
     tp := gp.TxPublish
+    newTp := tp.Copy()
+    //fmt.Println("HandlePktTxPublish: TxPublish after copy " + newTp.HashStr())
+
+
+    newTx := newTp.Transaction
+
+    //fmt.Println("HandlePktTxPublish after copy " + newTx.HashStr())
+
 
     // Discard transactions that is already in the pool
     txAlreadyInPool := false
     b.txsPoolMutex.Lock()
     for _, tx := range b.txsPool {
-        if tx.HashStr() == tp.Transaction.HashStr() {
+        if tx.HashStr() == newTx.HashStr() {
             txAlreadyInPool = true
             break
         }
@@ -187,18 +200,21 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
 
     if !txAlreadyInPool {
         // Validate transaction according to its content
-        isValid, errorMsg := b.isValidTx(&tp.Transaction)
+        //debug.Debug("HandlePktTxPublish 2")
+        isValid, errorMsg := b.isValidTx(&newTx)
         if !isValid {
             fmt.Println("Discarding TxPublish: " + errorMsg)
+            //debug.Debug("HandlePktTxPublish 3")
             return
         }
 
         // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-        b.addTxToPool(tp.Transaction)
+        b.addTxToPool(newTx)
     }
 
     // If HopLimit is > 1 decrement and broadcast
-    b.broadcastTxPublishDecrementingHopLimit(tp)
+    b.broadcastTxPublishDecrementingHopLimit(&newTp)
+    //fmt.Println("HandlePktTxPublish after broadcast " + newTp.Transaction.HashStr())
 }
 
 
@@ -206,11 +222,15 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
     errorMsg = ""
     isValid = true
 
+    //debug.Debug("isValidTx 1")
     if !b.VerifyTx(tx) {
         errorMsg = "Invalid Signature"
         isValid = false
         return
     }
+
+    //debug.Debug("isValidTx 2")
+
 
     switch {
         case tx.File != nil:
@@ -529,6 +549,7 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         return
     }
 
+    //debug.Debug("HandlePktBlockPublish 1")
     // Validate all transactions in the block before integrating it into the blockchain
     for _, tx := range bp.Block.Transactions {
         isValid, errorMsg := b.isValidTx(&tx)
@@ -537,6 +558,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
             return
         }
     }
+    //debug.Debug("HandlePktBlockPublish 2")
+
 
     // Validate transactions of type ShareTx
     validTxShares := b.validateBlockShareTxs(bp.Block.Transactions)
@@ -544,6 +567,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         fmt.Println("Invalid asset transactions")
         return
     }
+    //debug.Debug("HandlePktBlockPublish 3")
+
 
     // Validate transactions of type Identity
     validIdentities := b.validateBlockIdentities(bp.Block.Transactions)
@@ -551,6 +576,8 @@ func (b *Blockchain) HandlePktBlockPublish(gp *model.GossipPacket) {
         fmt.Println("Invalid identity transactions")
         return
     }
+    //debug.Debug("HandlePktBlockPublish 4")
+
 
     fmt.Printf("🔗 NEW BLOCK \n\n")
 
@@ -743,7 +770,7 @@ func (b *Blockchain) printBlockchain(headHash string) {
 	}
 	b.blocksMutex.RUnlock()
 
-	fmt.Println("⛓ CHAIN" + chainStr + "\n")
+	fmt.Println("⛓  CHAIN" + chainStr + "\n")
 }
 
 func (b *Blockchain) printAssetsOwnership() {
@@ -758,7 +785,7 @@ func (b *Blockchain) printAssetsOwnership() {
 	}
 	b.AssetsMutex.Unlock()
 
-	fmt.Println("ASSET OWNERSHIP:\n" + toPrint)
+	fmt.Println("🗂  ASSET OWNERSHIP:\n" + toPrint)
 }
 
 func (b *Blockchain) printVotings() {
@@ -799,6 +826,7 @@ func (b *Blockchain) printVotings() {
 
 				bool_str = strconv.FormatBool(ans_decrypted.Answer)
 			}
+
 			toPrint += "\n---" + voteReplier +" "+ bool_str
 		}
 		toPrint += "\n"
@@ -806,12 +834,13 @@ func (b *Blockchain) printVotings() {
 
 	b.VoteAnswersMutex.Unlock()
 
-	fmt.Println("VOTATIONS:\n" + toPrint)
+	fmt.Println("🙋🏻‍♂️ VOTATIONS:\n" + toPrint)
 }
 
 func (b *Blockchain) broadcastTxPublish(tp *model.TxPublish) {
 	gp := model.GossipPacket{TxPublish: tp}
 	go b.gossiper.sendGossipPacket(&gp, b.gossiper.peers)
+
 }
 
 func (b *Blockchain) broadcastTxPublishDecrementingHopLimit(tp *model.TxPublish) {
@@ -863,9 +892,12 @@ func (b *Blockchain) SendShareTx(asset, to string, amount uint64) {
 }
 
 func (b *Blockchain) SendTxPublish(tx *model.Transaction) {
+
     if tx.Signature == nil {
+        debug.Debug("Computing signature")
         b.gossiper.SignTx(tx)
     }
+
 
     tp := model.TxPublish{
 		Transaction: *tx,
