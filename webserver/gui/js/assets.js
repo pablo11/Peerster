@@ -23,7 +23,7 @@ $(document).ready(function() {
     //  Update the asset's votations every 2 seconds
     setInterval(function() {
         showAsset(currentAsset)
-    }, 2000)
+    }, 3000)
 
     $("#assetModal").on('hide.bs.modal', function() {
         currentAsset = ""
@@ -92,14 +92,18 @@ function fetchAndDisplayMyAssets() {
     $.get("api/assets/list", function(assetsReturned, status) {
         //console.log(assets, status);
         assets = assetsReturned
-        var html = ""
+        var htmlRows = []
         for (assetName in assets) {
             var a = assets[assetName]
             //data-toggle="modal" data-target="#assetModal"
-            html += '<tr onclick="showAsset(\'' + assetName + '\')"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>'
+            htmlRows.push('<tr onclick="showAsset(\'' + assetName + '\')"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>')
         }
 
-        $('#listAssetsRows').html(html)
+        htmlRows = htmlRows.sort((a, b) => {
+            return a.toLowerCase() > b.toLowerCase()
+        })
+
+        $('#listAssetsRows').html(htmlRows.join(""))
     })
 }
 
@@ -136,42 +140,58 @@ function showAsset(assetName) {
             }
         }
         if (!newVotesDiffer) {
-            console.log("compared but equals");
             return
         }
 
         $('#assetModalListVotes').html('')
 
-        console.log("compare", currentVotes, votes);
-
         currentVotes = votes
 
-        console.log(votes);
-        var html = ""
+        var htmlRows = []
         for (vote in votes) {
             v = votes[vote]
+            var totReplies = 0
             var positiveAnswers = 0
             var negativeAnswers = 0
             var thisNodeReply = ""
             for (holderName in v.answers) {
                 if (holderName == nodeName) {
-                    thisNodeReply = v.answers[nodeName]
+                    thisNodeReply = v.answers[holderName].reply
                 }
 
-                if (v.answers[holderName] == "yes") {
-                    positiveAnswers += 1
+                totReplies += v.answers[holderName].balance
+                if (v.answers[holderName].reply == "yes") {
+                    positiveAnswers += v.answers[holderName].balance
                 } else {
-                    negativeAnswers += 1
+                    negativeAnswers += v.answers[holderName].balance
                 }
+            }
+
+            var nbAnswers = Object.keys(v.answers).length || 0
+            var positiveAnswersPercentage = (totReplies > 0) ? (parseFloat(positiveAnswers) / parseFloat(totReplies) * 100.0).toFixed(1) : 0
+            var decision = ""
+            if (positiveAnswersPercentage > 50) {
+                decision = "<b style=\"color:green;\">Yes</b> with " + positiveAnswersPercentage + "%"
+            } else {
+                decision = "<b style=\"color:red;\">No</b> with " + (100 - positiveAnswersPercentage) + "%"
+            }
+
+            if (nbAnswers == 0) {
+                decision = "-"
             }
 
             htmlVote = (thisNodeReply != "") ? thisNodeReply : `<div class="btn-group">
                 <button type="button" class="btn btn-xs btn-success" onclick="voteOnAsset(this, '` + v.question + `',true, '` + v.origin + `')">yes</button>
                 <button type="button" class="btn btn-xs btn-danger" onclick="voteOnAsset(this, '` + v.question + `',false, '` + v.origin + `')">no</button>
             </div>`
-            html += '<tr><td>' + v.question  + '</td><td>' + positiveAnswers + '/' + negativeAnswers + '</td><td>' + v.origin + '</td><td>' + htmlVote + '</td></tr>'
+            htmlRows.push('<tr><td>' + v.question  + '</td><td>' + decision + '</td><td>' + nbAnswers + '</td><td>' + v.origin + '</td><td>' + htmlVote + '</td></tr>')
         }
-        $('#assetModalListVotes').html(html)
+
+        htmlRows = htmlRows.sort((a, b) => {
+            return a.toLowerCase() > b.toLowerCase()
+        })
+
+        $('#assetModalListVotes').html(htmlRows.join(""))
     })
 
 }
@@ -219,10 +239,11 @@ function voteOnAsset(button, question, answer, origin) {
         origin: origin,
         answer: answerBoolStr
     }, function(data, status) {
+        console.log("voting", question, currentVotes);
         // Find the right question and answer in the currentVotes and add the vote
         for (vote in currentVotes) {
             if (currentVotes[vote].question == question) {
-                currentVotes[vote][origin] = answerStr
+                currentVotes[vote].answers[origin] = {reply: answerStr, balance: parseInt($('#modalAssetBalance').html())}
             }
         }
 
