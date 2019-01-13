@@ -96,7 +96,7 @@ function fetchAndDisplayMyAssets() {
         for (assetName in assets) {
             var a = assets[assetName]
             //data-toggle="modal" data-target="#assetModal"
-            html += '<tr onclick="showAsset(\'' + assetName + '\')"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>'
+            htmlRows.push('<tr onclick="showAsset(\'' + assetName + '\')"><td>' + assetName + '</td><td>' + a.balance + '</td><td>' + a.totSupply + '</td></tr>')
         }
 
         htmlRows = htmlRows.sort((a, b) => {
