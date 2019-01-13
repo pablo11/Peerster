@@ -6,24 +6,24 @@ var identityRegistered = false
 
 $(document).ready(function() {
     loadNodeId()
-    setupIdentityRegistrationRequirement()
+    checkIfIdentityIsRegistered(true)
+    //setupIdentityRegistrationRequirement()
 
-    if (identityRegistered) {
-        setupCreateNewAsset()
-        setupSendShares()
-        setupAskQuestion()
+    setupCreateNewAsset()
+    setupSendShares()
+    setupAskQuestion()
 
-        fetchAndDisplayMyAssets()
-        setInterval(function() {
+    fetchAndDisplayMyAssets()
+    setInterval(function() {
+        if (identityRegistered) {
             fetchAndDisplayMyAssets()
-        }, 2000)
+        }
+    }, 2000)
 
-        //  Update the asset's votations every 3 seconds
-
-        setInterval(function() {
-            showAsset(currentAsset)
-        }, 2000)
-    }
+    //  Update the asset's votations every 2 seconds
+    setInterval(function() {
+        showAsset(currentAsset)
+    }, 2000)
 
     $("#assetModal").on('hide.bs.modal', function() {
         currentAsset = ""
@@ -53,13 +53,17 @@ function setupIdentityRegistrationRequirement() {
     }
 }
 
-function checkIfIdentityIsRegistered() {
+function checkIfIdentityIsRegistered(isFirstTime = false) {
     $.get("api/identity/check", function(data, status) {
         identityRegistered = data.identityRegistered
         if (identityRegistered) {
             $("#registerIdentityModal").modal("hide")
         } else {
-            waitForIdentityRegistration()
+            if (isFirstTime) {
+                setupIdentityRegistrationRequirement()
+            } else {
+                waitForIdentityRegistration()
+            }
         }
     })
 }
