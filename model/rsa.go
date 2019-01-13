@@ -11,7 +11,7 @@ import (
 
 type Signature struct {
     Name string
-    Signature []byte
+    BitString []byte
 }
 
 func NewPrivateKey() *rsa.PrivateKey {
@@ -29,12 +29,17 @@ func NewPrivateKey() *rsa.PrivateKey {
 func (s *Signature) Copy() Signature {
     newSignature := Signature{
         Name: s.Name,
-        Signature: make([]byte, len(s.Signature)),
+        BitString: make([]byte, len(s.BitString)),
     }
 
-    copy(newSignature.Signature[:], s.Signature[:])
+    copy(newSignature.BitString[:], s.BitString[:])
 
     return newSignature
+}
+
+
+func (s *Signature) PrintSignature() {
+    fmt.Printf("🔏 Signature: Name=%v Hash(Bitstring)=%v\n", s.Name, hex.EncodeToString(s.BitString))
 }
 
 func PrivateKeyString(privateKey *rsa.PrivateKey) string {

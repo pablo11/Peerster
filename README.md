@@ -85,7 +85,11 @@ Chain of 3 peers A<->B<->C
 `./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
 `./client -UIPort=10001 -file=2chunks.test`
 `./client -UIPort=10001 -identity=nodeA`
+`./client -UIPort=10001 -asset=Ufity -amount=100 -dest=nodeA`
+`./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity`
+`./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity -origin=nodeA -answer=true`
+
 
 
 # TODO
-Check new branch crypto
+Check new branch signing
