@@ -3,17 +3,41 @@ package gossip
 import (
     "fmt"
     "github.com/pablo11/Peerster/model"
-	//"github.com/pablo11/Peerster/util/debug"
+	"github.com/pablo11/Peerster/util/debug"
 	"regexp"
 )
 
 func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) {
     if gp.Private.Destination == g.Name {
+
+        if gp.Private.Signature != nil {
+            if !g.Blockchain.VerifyPrivateMessage(gp.Private) {
+                fmt.Printf("Private message forged -> Refused")
+                return
+            }
+        }
+
+        // If the package is encrypted, decrypt it
+        if gp.Private.IsEncrypted {
+            debug.Debug("Receiving a message encrypted")
+
+            g.DecryptPrivateMessage(gp.Private)
+        } else {
+            debug.Debug("Receiving a message in plain text")
+        }
+
         // If the private message is for this node, display it
         g.printGossipPacket("", fromAddrStr, gp)
 		//debug.Debug("Received private message ")
+<<<<<<< HEAD
 		if checkPMWithKey(gp.Private.Text) {
 	
+=======
+
+
+        if checkPMWithKey(gp.Private.Text) {
+
+>>>>>>> 56c56d720c2bbb38ad867469ebe3fbe50d7bbf32
 			key, question_id := getKeyFromPM(gp.Private.Text)
 	
 			g.Blockchain.VoteStatementMutex.Lock()
@@ -28,7 +52,7 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
 				//debug.Debug("Received a symmetric key for question "+question_id)
 			}
 		}
-		
+
     } else {
         // Forward the message and decrease the HopLimit
         pm := gp.Private

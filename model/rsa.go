@@ -40,6 +40,7 @@ func (s *Signature) Copy() Signature {
 
 func (s *Signature) PrintSignature() {
     fmt.Printf("🔏 Signature: Name=%v Hash(Bitstring)=%v\n", s.Name, hex.EncodeToString(s.BitString))
+    //fmt.Printf("🔏 Signature: Name=%v Hash(Bitstring)=\n", s.Name)
 }
 
 func PrivateKeyString(privateKey *rsa.PrivateKey) string {
