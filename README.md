@@ -92,4 +92,4 @@ Chain of 3 peers A<->B<->C
 
 
 # TODO
-Check new branch signing
+Check new branch encryption
