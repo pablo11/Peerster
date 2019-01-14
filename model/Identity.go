@@ -2,11 +2,11 @@ package model
 
 import (
 	"crypto/rsa"
-    "fmt"
-    "encoding/hex"
 	"crypto/sha256"
-    "crypto/x509"
+	"crypto/x509"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 )
 
 type Identity struct {
@@ -24,9 +24,8 @@ func (i *Identity) Hash() (out [32]byte) {
 }
 
 func (i *Identity) HashStr() string {
-    fixOut := i.Hash()
-    out := fixOut[:]
-	return hex.EncodeToString(out)
+	hash := i.Hash()
+	return hex.EncodeToString(hash[:])
 }
 
 func (i *Identity) String() string {
@@ -34,11 +33,11 @@ func (i *Identity) String() string {
 }
 
 func (i *Identity) PublicKeyObj() *rsa.PublicKey {
-    publicKey, err := x509.ParsePKCS1PublicKey(i.PublicKey)
-
-    if err != nil {
-        fmt.Println(err)
-    }
+	publicKey, err := x509.ParsePKCS1PublicKey(i.PublicKey)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
 
 	return publicKey
 }
@@ -48,11 +47,11 @@ func (i *Identity) Copy() Identity {
 		Name:      i.Name,
 		PublicKey: make([]byte, len(i.PublicKey)),
 	}
-    copy(newIdentity.PublicKey, i.PublicKey)
+	copy(newIdentity.PublicKey, i.PublicKey)
 
 	return newIdentity
 }
 
 func (i *Identity) SetPublicKey(publicKey *rsa.PublicKey) {
-     i.PublicKey = x509.MarshalPKCS1PublicKey(publicKey)
+	i.PublicKey = x509.MarshalPKCS1PublicKey(publicKey)
 }

@@ -35,18 +35,14 @@ func (b *Block) PrevHashStr() string {
 func (b *Block) Hash() (out [32]byte) {
 	h := sha256.New()
 	h.Write(b.PrevHash[:])
-
 	h.Write(b.Nonce[:])
-
 	binary.Write(h, binary.LittleEndian, uint32(len(b.Transactions)))
-
 	for _, t := range b.Transactions {
 		th := t.Hash()
 		h.Write(th[:])
 	}
 
 	copy(out[:], h.Sum(nil))
-
 	return
 }
 
@@ -66,7 +62,6 @@ func (b *Block) Mine() {
 func (b *Block) IsValid() bool {
 	blockHash := b.Hash()
 	blockHashStr := hex.EncodeToString(blockHash[:])
-
 	return blockHashStr[0:MINING_DIFFICULTY] == strings.Repeat("0", MINING_DIFFICULTY)
 }
 

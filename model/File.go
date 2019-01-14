@@ -1,68 +1,68 @@
 package model
 
 import (
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/binary"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 )
 
 type FileDownload struct {
-    LocalName string
-    MetaHash []byte
-    NextChunkOffset int
-    NextChunkHash string
-    NbChunks int
-    ChunksLocation []string
+	LocalName       string
+	MetaHash        []byte
+	NextChunkOffset int
+	NextChunkHash   string
+	NbChunks        int
+	ChunksLocation  []string
 }
 
 type ActiveSearch struct {
-    Keywords []string
-    LastBudget uint64
-    NotifyChannel chan bool
-    // Metahash -> FileMatch
-    Matches map[string]*FileMatch
+	Keywords      []string
+	LastBudget    uint64
+	NotifyChannel chan bool
+	// Metahash -> FileMatch
+	Matches map[string]*FileMatch
 }
 
 type FileMatch struct {
-    Filename string
-    MetaHash string
-    NbChunks uint64
-    // Map: chunck nb -> node having it
-    ChunksLocation []string
+	Filename string
+	MetaHash string
+	NbChunks uint64
+	// Map: chunck nb -> node having it
+	ChunksLocation []string
 }
 
 // For blockchain filename to hash mapping
 type File struct {
-    Name string
-    Size int64
-    MetafileHash []byte
+	Name         string
+	Size         int64
+	MetafileHash []byte
 }
 
 func (f *File) Hash() (out [32]byte) {
-    h := sha256.New()
-    binary.Write(h, binary.LittleEndian, uint32(len(f.Name)))
-    h.Write([]byte(f.Name))
-    h.Write(f.MetafileHash)
-    copy(out[:], h.Sum(nil))
-    return
+	h := sha256.New()
+	binary.Write(h, binary.LittleEndian, uint32(len(f.Name)))
+	h.Write([]byte(f.Name))
+	h.Write(f.MetafileHash)
+	copy(out[:], h.Sum(nil))
+	return
 }
 
 func (f *File) HashStr() string {
-    hash := f.Hash()
-    return hex.EncodeToString(hash[:])
+	hash := f.Hash()
+	return hex.EncodeToString(hash[:])
 }
 
 func (f *File) Copy() File {
-    var metafileHashCopy []byte = make([]byte, 32)
-    copy(metafileHashCopy[:], f.MetafileHash[:])
+	var metafileHashCopy []byte = make([]byte, 32)
+	copy(metafileHashCopy[:], f.MetafileHash[:])
 
-    return File{
-        Name: f.Name,
-        Size: f.Size,
-        MetafileHash: metafileHashCopy,
-    }
+	return File{
+		Name:         f.Name,
+		Size:         f.Size,
+		MetafileHash: metafileHashCopy,
+	}
 }
 
 func (f *File) String() string {
-    return "FILE=" + f.Name
+	return "FILE=" + f.Name
 }

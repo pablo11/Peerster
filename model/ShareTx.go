@@ -1,51 +1,51 @@
 package model
 
 import (
-    "time"
-    "strconv"
-    "crypto/sha256"
-    "encoding/hex"
-    "encoding/binary"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"strconv"
+	"time"
 )
 
 type ShareTx struct {
-    Asset string
-    Amount uint64
-    From string // The name of the sender of the transaction
-    To string // The name of the destinatary taken from the identities in the blockchain
-    Nonce int64 // This nonce is required to make the hash of two transaction with the same content deifferent
+	Asset  string
+	Amount uint64
+	From   string // The name of the sender of the transaction
+	To     string // The name of the destinatary taken from the identities in the blockchain
+	Nonce  int64  // This nonce is required to make the hash of two transaction with the same content deifferent
 }
 
 func (st *ShareTx) GenerateNonce() {
-    st.Nonce = time.Now().UnixNano()
+	st.Nonce = time.Now().UnixNano()
 }
 
 func (st *ShareTx) Hash() (out [32]byte) {
-    h := sha256.New()
-    binary.Write(h, binary.LittleEndian, st.Amount)
-    h.Write([]byte(st.Asset))
-    h.Write([]byte(st.From))
-    h.Write([]byte(st.To))
-    binary.Write(h, binary.LittleEndian, st.Nonce)
-    copy(out[:], h.Sum(nil))
-    return
+	h := sha256.New()
+	binary.Write(h, binary.LittleEndian, st.Amount)
+	h.Write([]byte(st.Asset))
+	h.Write([]byte(st.From))
+	h.Write([]byte(st.To))
+	binary.Write(h, binary.LittleEndian, st.Nonce)
+	copy(out[:], h.Sum(nil))
+	return
 }
 
 func (st *ShareTx) HashStr() string {
-    hash := st.Hash()
-    return hex.EncodeToString(hash[:])
+	hash := st.Hash()
+	return hex.EncodeToString(hash[:])
 }
 
 func (st *ShareTx) String() string {
-    return "SHARE_TX=" + st.From + "->" + st.To + "(" + strconv.Itoa(int(st.Amount)) + " " + st.Asset +")"
+	return "SHARE_TX=" + st.From + "->" + st.To + "(" + strconv.Itoa(int(st.Amount)) + " " + st.Asset + ")"
 }
 
 func (st *ShareTx) Copy() ShareTx {
-    return ShareTx{
-        Asset: st.Asset,
-        Amount: st.Amount,
-        From: st.From,
-        To: st.To,
-        Nonce: st.Nonce,
-    }
+	return ShareTx{
+		Asset:  st.Asset,
+		Amount: st.Amount,
+		From:   st.From,
+		To:     st.To,
+		Nonce:  st.Nonce,
+	}
 }
