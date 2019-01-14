@@ -812,12 +812,14 @@ func (b *Blockchain) printVotings() {
 	}
 	b.gossiper.QuestionKeyMutex.Unlock()
 
+	
+	
 	b.VoteAnswersMutex.Lock()
 	for question_id, question_print := range question_prints {
 		toPrint += question_print
 		for voteReplier, vote := range b.VoteAnswers[question_id]{
 
-			//TODO: I HAVE TO LOCK HERE
+			
 			key, keyExists := question_keys_copy[question_id]
 			var bool_str string
 			if keyExists{

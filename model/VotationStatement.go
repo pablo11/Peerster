@@ -5,6 +5,12 @@ import (
     "encoding/hex"
 )
 
+/*
+Structure include in a transaction used to start vote
+Question: The subject of the question
+Origin: The originator of the question
+AssetName: Name of the asset on which voting in launch
+*/
 type VotationStatement struct{
 	Question	string
 	Origin		string

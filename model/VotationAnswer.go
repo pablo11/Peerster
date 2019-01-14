@@ -8,13 +8,20 @@ import (
 	"crypto/aes"
     "crypto/cipher"
     "github.com/dedis/protobuf"
-	//"github.com/pablo11/Peerster/util/debug"
 	"io"
 	"errors"
 )
 
 //======================VOTATION ANSWER WRAPPED=========================
 
+/*
+Structure include in a transaction used to answer a vote
+Answer: the answer boolean encrypted
+Question: the question answered
+Origin: the origin node that iniciate the question
+AssetName: the asset on which the question have been asked
+Replier: the name of the node replying vote
+*/
 type VotationAnswerWrapper struct{
 	Answer 		[]byte
 	Question	string
@@ -53,6 +60,9 @@ func (vaw *VotationAnswerWrapper) String() string {
     return "VOTATION_ANSWER_WRAPPED= FROM " + vaw.Origin +" QUESTION "+vaw.Question +" ASSET "+vaw.AssetName+" REPLIED BY "+vaw.Replier
 }
 
+/*
+Function to obtain the identifier of the question being answered in VotationAnswerWrapper
+*/
 func (vaw *VotationAnswerWrapper) GetVotationId() string{
 	new_vs := &VotationStatement{
 		Question: vaw.Question,
@@ -64,8 +74,11 @@ func (vaw *VotationAnswerWrapper) GetVotationId() string{
 	return hex.EncodeToString(hash[:])
 }
 
+/*
+Function to decrypt a VotationAnswerWrapper using key argument using AES crypto
+The function return a Votation Answer (decrypted)
+*/
 func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
-	//debug.Debug("Trying to decrypt votationAnswer with symmetric key")
 
 	ciphertext := vaw.Answer
 
@@ -81,10 +94,9 @@ func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
         return va_decoded, err
     }
 
-	//THIS COULD PROBABLY FAIL BE CAREFUL !
+	
     nonceSize := gcm.NonceSize()
     if len(ciphertext) < nonceSize {
-		//debug.Debug("Votation Answer cipher text too short")
         return va_decoded, errors.New("ciphertext too short")
     }
 
@@ -100,11 +112,8 @@ func (vaw *VotationAnswerWrapper) Decrypt(key []byte) (VotationAnswer, error) {
     err = protobuf.Decode(byte_decoded, &va_decoded)
 
 	if err != nil {
-		//debug.Debug("Votation Answer didn't deserialized with protobuf")
         return va_decoded, err
     }
-
-	//debug.Debug("Decryption votation Answer worked!")
 
 	return va_decoded,err
 }
@@ -133,9 +142,11 @@ func (va *VotationAnswer) String() string {
     return "VOTATION_ANSWER= "+strconv.FormatBool(va.Answer)
 }
 
-
+/*
+Function to encrypt a VotationAnswer with a key passed as argument using AES crypto
+The answer is a []byte
+*/
 func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
-	//debug.Debug("Trying to encrypt votationAnswer with symmetric key")
 	va_encoded, err := protobuf.Encode(va)
 
 
@@ -154,6 +165,5 @@ func (va *VotationAnswer) Encrypt(key []byte) ([]byte, error) {
         return nil, err
     }
 
-	//debug.Debug("Encryption votation Answer worked!")
     return gcm.Seal(nonce, nonce, va_encoded, nil), nil
 }

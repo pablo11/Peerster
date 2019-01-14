@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"math/rand"
 	"github.com/pablo11/Peerster/model"
-	//"github.com/pablo11/Peerster/util/debug"
 )
 
+/*
+Function to start a new vote 
+question: the subject of the new vote
+assetName: the asset on which question is asked
+*/
 func (g *Gossiper) LaunchVotation(question string, assetName string){
-	//Create and put TxVotationStatement in pending Blocks
-	//Send symmetric key to all peers
-
-	//debug.Debug("Launching votating")
+	//Create, validate and put TxVotationStatement in pending Blocks
 	vs := model.VotationStatement{
 		Question: question,
 		Origin:	g.Name,
@@ -27,7 +28,6 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 		Signature: sign,
 	}
 
-	//debug.Debug("Checking votating correctness")
 	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
 	if !isValid {
         fmt.Println("Discarding Tx: " + errorMsg)
@@ -41,9 +41,16 @@ func (g *Gossiper) LaunchVotation(question string, assetName string){
 
 }
 
+/*
+Function to answer a vote
+question_subject: the question that we are trying to answer
+assetName: the name of the asset on which question was stated
+origin: the name of the originator node of the question
+answer: our answer to the question
+*/
 func (g *Gossiper) AnswerVotation(question_subject string, assetName string, origin string, answer bool){
-	//Get question corresponding to votation_id
-	//debug.Debug("Answering vote question")
+	//Create, encrypt, validate and put TxAnswerVotation in pending Blocks
+
 
 	votation_id := model.GetVotationId(question_subject,assetName,origin)
 
@@ -75,7 +82,6 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 		return
 	}
 
-	//Encrypt va
 	va_enc, err := va.Encrypt(key_byte)
 
 	if err != nil {
@@ -99,8 +105,6 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
 		Signature: sign,
 	}
 
-	//Send SendFileTx
-	//debug.Debug("Checking correctness of vote answer")
 	isValid, errorMsg := g.Blockchain.isValidTx(&tx)
 	if !isValid {
         fmt.Println("Discarding Tx: " + errorMsg)
@@ -108,10 +112,13 @@ func (g *Gossiper) AnswerVotation(question_subject string, assetName string, ori
     }
 	g.Blockchain.SendTxPublish(&tx)
 
-	//move from pending to completed? => This is done in GUI
 }
 
-
+/*
+Function to send private key to answer a question to all shareholders
+questionId: we send a symmetric key to answer the question identified by questionId
+assetName: the name of the asset on which the question is
+*/
 func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
 
 	key := make([]byte, 32)
@@ -123,19 +130,21 @@ func (g *Gossiper) sendKeyToAllPeers(questionId string, assetName string){
 	g.QuestionKeyMutex.Unlock()
 	
 	var peers []string
-	//Send to all shareholders
+	//Retreive all shareholders
 	g.Blockchain.AssetsMutex.Lock()
 	for p,_ := range g.Blockchain.Assets[assetName]{
-		peers = append(peers, p) //Assume that peer with asset 0 have been removed
+		//Assume that peer with asset 0 have been removed
+		peers = append(peers, p) 
 	}
 	g.Blockchain.AssetsMutex.Unlock()
 
 	for _,p := range peers{
 		if p != g.Name {
+			//Encrypt, sign and send
 			pm := g.NewEncryptedPrivateMessage(g.Name, createPMWithKey(key_str,questionId), p)
             g.SignPrivateMessage(pm)
 			g.SendPrivateMessage(pm)
 		}
 	}
-	//debug.Debug("Sending symmetric to all peers -> OK")
+	
 }

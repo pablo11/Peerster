@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const MINING_DIFFICULTY int = 5 // Each unit of mining difficulty corresponds to 4 bits
+const MINING_DIFFICULTY int = 6 // Each unit of mining difficulty corresponds to 4 bits
 
 type BlockPublish struct {
 	Block    Block

@@ -370,23 +370,22 @@ func (a *ApiHandler) VotationReply(w http.ResponseWriter, r *http.Request) {
 
 func (a *ApiHandler) VotationResult(w http.ResponseWriter, r *http.Request) {
 
-	//reply only answers for votating I'm in
 
 	a.gossiper.Blockchain.VoteStatementMutex.Lock()
-	voteStatements := a.gossiper.Blockchain.VoteStatement //Is lock here enought because after we iterate...
+	voteStatements := a.gossiper.Blockchain.VoteStatement 
 	a.gossiper.Blockchain.VoteStatementMutex.Unlock()
 	a.gossiper.Blockchain.AssetsMutex.Lock()
-	assetsMap := a.gossiper.Blockchain.Assets //Same here
+	assetsMap := a.gossiper.Blockchain.Assets 
 	a.gossiper.Blockchain.AssetsMutex.Unlock()
 	a.gossiper.Blockchain.VoteAnswersMutex.Lock()
-	voteAnswers := a.gossiper.Blockchain.VoteAnswers //Same here
+	voteAnswers := a.gossiper.Blockchain.VoteAnswers 
 	a.gossiper.Blockchain.VoteAnswersMutex.Unlock()
 
 	var jsonFiles []string
 
 	for question_id, vs := range voteStatements {
 		haveTheAsset := false
-		//Only send question for assets you have
+
 		for shareholders,shares := range assetsMap[vs.AssetName] {
 			if shareholders == a.gossiper.Name && shares > 0{
 				haveTheAsset = true
