@@ -172,20 +172,10 @@ func (b *Blockchain) GetAssetVotesJson(assetName string) string {
 }
 
 func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
-    //debug.Debug("HandlePktTxPublish 1")
-
-    //fmt.Println("HandlePktTxPublish: Transaction before copy " + gp.TxPublish.Transaction.HashStr())
-
-    //fmt.Println("HandlePktTxPublish: TxPublish before copy " + gp.TxPublish.HashStr())
     tp := gp.TxPublish
     newTp := tp.Copy()
-    //fmt.Println("HandlePktTxPublish: TxPublish after copy " + newTp.HashStr())
-
 
     newTx := newTp.Transaction
-
-    //fmt.Println("HandlePktTxPublish after copy " + newTx.HashStr())
-
 
     // Discard transactions that is already in the pool
     txAlreadyInPool := false
@@ -200,16 +190,25 @@ func (b *Blockchain) HandlePktTxPublish(gp *model.GossipPacket) {
 
     if !txAlreadyInPool {
         // Validate transaction according to its content
-        //debug.Debug("HandlePktTxPublish 2")
         isValid, errorMsg := b.isValidTx(&newTx)
         if !isValid {
             fmt.Println("Discarding TxPublish: " + errorMsg)
-            //debug.Debug("HandlePktTxPublish 3")
             return
         }
 
-        // If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
-        b.addTxToPool(newTx)
+		// Make sure that share transaction aren't double-spending
+		tmpTxsPool := make([]model.Transaction, len(b.txsPool))
+		b.txsPoolMutex.Lock()
+		copy(tmpTxsPool, b.txsPool)
+		b.txsPoolMutex.Unlock()
+		tmpTxsPool = append(tmpTxsPool, newTx)
+
+		if b.validateBlockShareTxs(tmpTxsPool) {
+			// If it's valid and has not yet been seen, store it in the pool of trx to be added in next block
+	        b.addTxToPool(newTx)
+		} else {
+			return
+		}
     }
 
     // If HopLimit is > 1 decrement and broadcast
@@ -360,7 +359,7 @@ func (b *Blockchain) isValidTx(tx *model.Transaction) (isValid bool, errorMsg st
 func (b *Blockchain) isShareTxValidlySigned(tx *model.Transaction) (isValid bool, errorMsg string) {
     errorMsg = ""
     isValid = true
-    isValidSignature := true
+	isValidSignature := true
 
     // Make sure that the sender (From) and destinatary (To) identities are in the blockchain
 	if tx.ShareTx.From != "" {
@@ -372,8 +371,7 @@ func (b *Blockchain) isShareTxValidlySigned(tx *model.Transaction) (isValid bool
 	        isValid = false
 	        return
 		}
-
-        isValidSignature = tx.Signature.Name == fromIdentity.Name
+		isValidSignature = isValidSignature && tx.Signature.Name == fromIdentity.Name
 	}
 
 	b.identitiesMutex.Lock()
@@ -385,15 +383,15 @@ func (b *Blockchain) isShareTxValidlySigned(tx *model.Transaction) (isValid bool
         return
     }
 
-    if tx.ShareTx.From == "" {
-        isValidSignature = tx.Signature.Name == toIdentity.Name
-    }
-
+	// Check signature
+	if tx.ShareTx.From == "" {
+		isValidSignature = isValidSignature && tx.Signature.Name == toIdentity.Name
+	}
+	isValidSignature = isValidSignature && b.VerifyTx(tx)
 
     if !isValidSignature {
         errorMsg = "Invalid signature of share transaction"
         isValid = false
-        return
     }
 
     return
@@ -504,8 +502,6 @@ func (b *Blockchain) applyShareTxs(txs []model.Transaction) {
                 b.Assets[tx.ShareTx.Asset][tx.ShareTx.To] = tx.ShareTx.Amount
                 b.AssetsMutex.Unlock()
             }
-            //*/
-
 		}
 	}
 }

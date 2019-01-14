@@ -32,13 +32,13 @@ func (g *Gossiper) HandlePktPrivate(gp *model.GossipPacket, fromAddrStr string) 
 
 		if checkPMWithKey(gp.Private.Text) {
 			key, question_id := getKeyFromPM(gp.Private.Text)
-	
+
 			g.Blockchain.VoteStatementMutex.Lock()
 			question, questionExist := g.Blockchain.VoteStatement[question_id]
 			g.Blockchain.VoteStatementMutex.Unlock()
-			
+
 			if questionExist && question.Origin == gp.Private.Origin {
-				
+
 				g.QuestionKeyMutex.Lock()
 				g.QuestionKey[question_id] = key
 				g.QuestionKeyMutex.Unlock()
