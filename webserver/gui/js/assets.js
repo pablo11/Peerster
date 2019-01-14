@@ -129,7 +129,7 @@ function showAsset(assetName) {
                 // There's a new vote statement
                 newVotesDiffer = true
             } else {
-                if (Object.keys(currentVotes[vote].answers).length != Object.keys(votes[vote].answers).length) {
+                if (Object.keys(currentVotes[vote].answers).length < Object.keys(votes[vote].answers).length) {
                     // There are new votes to the question
                     console.log("votes differ 2", currentVotes[vote].answers, votes[vote].answers);
                     newVotesDiffer = true
