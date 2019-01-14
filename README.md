@@ -38,9 +38,16 @@ Each node in Peerster acts as a ​gossiper​, as depicted above, but also ​e
 - GUI allowing file search, file download
 - Blockchain with mining and fork handling to guarantee unique filenames
 
+#### Project:
+- identities on the blockchain
+- Sign and encrypt messages
+- Assets on the blockchain
+- Sending shares of assets
+- Propose votes and vote for assets
+
 ---
 ## Run it
-#### The gossiper
+### The gossiper
 Navigate to the project directory in a terminal and type `go build`. Then type `./Peerster` with the following options to launch the gossiper.
 - `-UIPort=XXXX`: Port for the UI client (default 8080)
 - `-gossipAddr=ip:port`: ip:port for the gossiper (default 127.0.0.1:5000)
@@ -50,19 +57,28 @@ Navigate to the project directory in a terminal and type `go build`. Then type `
 - `-simple`: Run gossiper in simple broadcast mode is present
 - `-noGUI`: If this flag is present, don't run the webserver serving the GUI
 
-#### The client
+### The client
 The client allows multiple interactions:
+##### Messages
 - Sending a broadcast message: `./client -UIPort=XXXX -msg=YYYYYY`
 - Sending a private message to a peer: `./client -UIPort=XXXX -msg=YYYYYY -dest=peerName`
 - Sending an encrypted private message to a peer: `./client -UIPort=XXXX -msg=YYYYYY -dest=peerName -encrypt`
+
+##### File Sharing
 - Indexing a file (the file must be in the \_SharedFiles folder): `./client -UIPort=XXXX -file=filename`
 - Requesting a file to another peer: `./client -UIPort=XXXX -file=filename -dest=peerName -reqest=hashOfTheRequestedChunkOrMetafile`
 - Search files in the network by providing some keywords and optionally a budget: `./client -UIPort=XXXX -keywords=key1,key2 [-budget=4]`
+
+##### Blockchain
 - Inserting a new identity in the blockchain: `./client -UIPort=XXXX -identity=YYYYYY`
+- Create a new asset (being nodeA): `./client -UIPort=XXXX -asset=AssetName -amount=100 -dest=nodeA`
+- Send asset's shares: `./client -UIPort=XXXX -asset=AssetName -amount=50 -dest=nodeB`
+- Propose a vote regarding an asset that you own: `./client -UIPort=XXXX -question="Should fire the CEO?" -assetVote=AssetName`
+- Vote on a proposed vote: `./client -UIPort=XXXX -question="Should fire the CEO?" -assetVote=AssetName -origin=nodeA -answer=true/false`
 
 Navigate to the `/client` project's subdirectory in a terminal and type `go build`.
 
-#### The GUI
+### The GUI
 The GUI is served by default by this implementation of Peerster on startup.
 To see the GUI simply open a browser window and go at `127.0.0.1:UIPort`, where `UIPort` is the UIPort option (default 8080).
 
@@ -80,24 +96,3 @@ Chain of 3 peers A<->B<->C
 `./Peerster -rtimer=2 -name=nodeA -UIPort=10001 -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002`
 `./Peerster -rtimer=2 -name=nodeB -UIPort=10002 -gossipAddr=127.0.0.1:5002 -peers=127.0.0.1:5001,127.0.0.1:5003`
 `./Peerster -rtimer=2 -name=nodeC -UIPort=10003 -gossipAddr=127.0.0.1:5003 -peers=127.0.0.1:5002`
-
-#### The client
-##### Message
-Simple: `./client -UIPort=10001 -msg=hello`
-Private message: `./client -UIPort=10001 -msg=hello -dest=nodeB`
-Encrypted Private message: `./client -UIPort=10001 -msg=hello -dest=nodeB -encrypt`
-
-##### File Sharing
-Index a file: `./client -UIPort=10001 -file=2chunks.test`
-Download a file: `./client -UIPort=10002 -file=two.txt -dest=nodeA -request=3bbe464d4f594b30e823451fff26198d865fb256b041a1b1f114d400ff94a70c`
-
-##### Blockchain
-Identity: `./client -UIPort=10001 -identity=nodeA`
-Asset creation: `./client -UIPort=10001 -asset=Ufity -amount=100 -dest=nodeA` (from nodeA)
-Asset transaction: `./client -UIPort=10001 -asset=Ufity -amount=50 -dest=nodeB` (from nodeA)
-Vote question: `./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity`
-Vote answer: `./client -UIPort=10001 -question="Should Ufity do an ICO?" -assetVote=Ufity -origin=nodeA -answer=true`
-
-
-# TODO
-Check new branch encryption
