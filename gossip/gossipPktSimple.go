@@ -13,7 +13,7 @@ func (g *Gossiper) HandlePktSimple(gp *model.GossipPacket) {
     gp.Simple.RelayPeerAddr = g.address.String()
 
     // Broadcast the message to every peer except the one the message was received from
-    go g.sendGossipPacket(gp, collections.Filter(g.peers, func(p string) bool{
+    go g.sendGossipPacket(gp, collections.Filter(g.peers, func(p string) bool {
         return p != receivedFrom
     }))
 }
