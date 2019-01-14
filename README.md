@@ -9,6 +9,16 @@ Raphael Madillo <raphael.madillo@epfl.ch>
 
 ---
 
+# QUICKSTART
+To test this Peerster navigate to the project folder and type `go build` to compile the app.
+You can create as many peers as you want by changing the name, UIPort, gossipAddr and peers parameters of the following command:
+
+`./Peerster -rtimer=2 -UIPort=XXXX -gossipAddr=127.0.0.1:5001 -peers=127.0.0.1:5002 -name=nodeName`
+
+A GUI will be available on your machine through a web browser by accessing `localhost:XXXX` (where XXXX is the port number provided in the parameter UIPort).
+
+---
+
 ## About
 
 ### Gossiping in Peerster
