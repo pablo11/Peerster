@@ -27,6 +27,7 @@ $(document).ready(function() {
 
     $("#assetModal").on('hide.bs.modal', function() {
         currentAsset = ""
+        currentVotes = {}
     });
 })
 
@@ -119,20 +120,22 @@ function showAsset(assetName) {
     $('#modalAssetBalance').html(asset.balance)
     $('#modalAssetTotSupply').html(asset.totSupply)
 
-
     $("#assetModal").modal("show")
     $.get("api/asset/votes?asset=" + assetName, function(votes, status) {
         // Check if the new votes are differeent from the ones saved
         var newVotesDiffer = Object.keys(votes).length == 0
         for (vote in votes) {
             if (!currentVotes.hasOwnProperty(vote)) {
+                // There's a new vote statement
                 newVotesDiffer = true
             } else {
                 if (Object.keys(currentVotes[vote].answers).length != Object.keys(votes[vote].answers).length) {
+                    // There are new votes to the question
+                    console.log("votes differ 2", currentVotes[vote].answers, votes[vote].answers);
                     newVotesDiffer = true
                 } else {
                     for (holder in votes[vote].answers) {
-                        if (!currentVotes[vote].answers.hasOwnProperty(holder) || currentVotes[vote].answers[holder] != votes[vote].answers[holder]) {
+                        if (!currentVotes[vote].answers.hasOwnProperty(holder) || currentVotes[vote].answers[holder].reply != votes[vote].answers[holder].reply || currentVotes[vote].answers[holder].balance != votes[vote].answers[holder].balance) {
                             newVotesDiffer = true
                         }
                     }
@@ -143,57 +146,65 @@ function showAsset(assetName) {
             return
         }
 
-        $('#assetModalListVotes').html('')
-
         currentVotes = votes
 
         var htmlRows = []
         for (vote in votes) {
             v = votes[vote]
-            var totReplies = 0
-            var positiveAnswers = 0
-            var negativeAnswers = 0
-            var thisNodeReply = ""
-            for (holderName in v.answers) {
-                if (holderName == nodeName) {
-                    thisNodeReply = v.answers[holderName].reply
-                }
 
-                totReplies += v.answers[holderName].balance
-                if (v.answers[holderName].reply == "yes") {
-                    positiveAnswers += v.answers[holderName].balance
-                } else {
-                    negativeAnswers += v.answers[holderName].balance
-                }
-            }
+            var rowElements = prepareRowElements(v.answers)
 
-            var nbAnswers = Object.keys(v.answers).length || 0
-            var positiveAnswersPercentage = (totReplies > 0) ? (parseFloat(positiveAnswers) / parseFloat(totReplies) * 100.0).toFixed(1) : 0
-            var decision = ""
-            if (positiveAnswersPercentage > 50) {
-                decision = "<b style=\"color:green;\">Yes</b> with " + positiveAnswersPercentage + "%"
-            } else {
-                decision = "<b style=\"color:red;\">No</b> with " + (100 - positiveAnswersPercentage) + "%"
-            }
-
-            if (nbAnswers == 0) {
-                decision = "-"
-            }
-
-            htmlVote = (thisNodeReply != "") ? thisNodeReply : `<div class="btn-group">
-                <button type="button" class="btn btn-xs btn-success" onclick="voteOnAsset(this, '` + v.question + `',true, '` + v.origin + `')">yes</button>
-                <button type="button" class="btn btn-xs btn-danger" onclick="voteOnAsset(this, '` + v.question + `',false, '` + v.origin + `')">no</button>
-            </div>`
-            htmlRows.push('<tr><td>' + v.question  + '</td><td>' + decision + '</td><td>' + nbAnswers + '</td><td>' + v.origin + '</td><td>' + htmlVote + '</td></tr>')
+            htmlRows.push('<tr><td>' + v.question  + '</td><td>' + rowElements.decision + '</td><td>' + rowElements.nbAnswers + '</td><td>' + v.origin + '</td><td>' + rowElements.htmlVote + '</td></tr>')
         }
 
         htmlRows = htmlRows.sort((a, b) => {
             return a.toLowerCase() > b.toLowerCase()
         })
 
+        $('#assetModalListVotes').html('')
         $('#assetModalListVotes').html(htmlRows.join(""))
     })
 
+}
+
+function prepareRowElements(answers) {
+    var totReplies = 0
+    var positiveAnswers = 0
+    var negativeAnswers = 0
+    var thisNodeReply = ""
+    for (holderName in answers) {
+        if (holderName == nodeName) {
+            console.log("This node reply found");
+            thisNodeReply = answers[holderName].reply
+        }
+
+        totReplies += answers[holderName].balance
+        if (answers[holderName].reply == "yes") {
+            positiveAnswers += answers[holderName].balance
+        } else {
+            negativeAnswers += answers[holderName].balance
+        }
+    }
+
+    var positiveAnswersPercentage = (totReplies > 0) ? (parseFloat(positiveAnswers) / parseFloat(totReplies) * 100.0).toFixed(1) : 0
+    var decision = ""
+    if (positiveAnswersPercentage > 50) {
+        decision = "<b style=\"color:green;\">Yes</b> with " + positiveAnswersPercentage + "%"
+    } else {
+        decision = "<b style=\"color:red;\">No</b> with " + (100 - positiveAnswersPercentage) + "%"
+    }
+
+    var nbAnswers = Object.keys(answers).length || 0
+    if (nbAnswers == 0) {
+        decision = "-"
+    }
+
+    var htmlVote = (thisNodeReply != "") ? thisNodeReply : `<div class="btn-group">
+        <button type="button" class="btn btn-xs btn-success" onclick="voteOnAsset(this, '` + v.question + `',true, '` + v.origin + `')">yes</button>
+        <button type="button" class="btn btn-xs btn-danger" onclick="voteOnAsset(this, '` + v.question + `',false, '` + v.origin + `')">no</button>
+    </div>`
+
+    return {decision: decision, nbAnswers: nbAnswers, thisNodeReply: thisNodeReply, htmlVote: htmlVote}
 }
 
 function setupSendShares() {
@@ -231,7 +242,20 @@ function setupAskQuestion() {
 function voteOnAsset(button, question, answer, origin) {
     var answerStr = answer ? "yes" : "no"
     var answerBoolStr = answer ? "true" : "false"
-    $(button).parent().parent().html(answerStr)
+
+    //$(button).parent().parent().html(answerStr)
+
+    // Find the right question and answer in the currentVotes and add the vote
+    for (vote in currentVotes) {
+        if (currentVotes[vote].question == question) {
+            currentVotes[vote].answers[origin] = {reply: answerStr, balance: parseInt($('#modalAssetBalance').html())}
+
+            var rowElements = prepareRowElements(currentVotes[vote].answers)
+
+            var htmlRowContent = '<td>' + question  + '</td><td>' + rowElements.decision + '</td><td>' + rowElements.nbAnswers + '</td><td>' + currentVotes[vote].origin + '</td><td>' + rowElements.htmlVote + '</td>'
+            $(button).parent().parent().parent().html(htmlRowContent)
+        }
+    }
 
     $.post("api/asset/vote", {
         question: question,
@@ -239,14 +263,6 @@ function voteOnAsset(button, question, answer, origin) {
         origin: origin,
         answer: answerBoolStr
     }, function(data, status) {
-        console.log("voting", question, currentVotes);
-        // Find the right question and answer in the currentVotes and add the vote
-        for (vote in currentVotes) {
-            if (currentVotes[vote].question == question) {
-                currentVotes[vote].answers[origin] = {reply: answerStr, balance: parseInt($('#modalAssetBalance').html())}
-            }
-        }
-
         window.alert("Your answer was submitted to the blockchain.")
     })
 }
